@@ -1,17 +1,17 @@
 {
-    "name": ":vendor_slug/:package_slug",
-    "description": ":package_description",
+    "name": "bisual/laravel-shortcuts",
+    "description": "Laravel Shortcuts for Software Agencies",
     "keywords": [
-        ":vendor_name",
+        "bisual",
         "laravel",
-        ":package_slug"
+        "laravel-shortcuts"
     ],
-    "homepage": "https://github.com/:vendor_slug/:package_slug",
+    "homepage": "https://github.com/bisual/laravel-shortcuts",
     "license": "MIT",
     "authors": [
         {
-            "name": ":author_name",
-            "email": "author@domain.com",
+            "name": "Pol Ribas",
+            "email": "polribas14@gmail.com",
             "role": "Developer"
         }
     ],
@@ -35,13 +35,13 @@
     },
     "autoload": {
         "psr-4": {
-            "VendorName\\Skeleton\\": "src/",
-            "VendorName\\Skeleton\\Database\\Factories\\": "database/factories/"
+            "Bisual\\LaravelShortcuts\\": "src/",
+            "Bisual\\LaravelShortcuts\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "VendorName\\Skeleton\\Tests\\": "tests/"
+            "Bisual\\LaravelShortcuts\\Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -61,10 +61,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "VendorName\\Skeleton\\SkeletonServiceProvider"
+                "Bisual\\LaravelShortcuts\\LaravelShortcutsServiceProvider"
             ],
             "aliases": {
-                "Skeleton": "VendorName\\Skeleton\\Facades\\Skeleton"
+                "LaravelShortcuts": "Bisual\\LaravelShortcuts\\Facades\\LaravelShortcuts"
             }
         }
     },

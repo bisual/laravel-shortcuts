@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Bisual\LaravelShortcuts\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class LaravelShortcutsCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'laravel-shortcuts';
 
     public $description = 'My command';
 
