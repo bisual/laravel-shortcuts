@@ -16,10 +16,10 @@ class LaravelShortcutsServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('laravel-shortcuts')
-            ->hasConfigFile()
-            ->hasViews()
-            ->hasMigration('create_laravel-shortcuts_table')
-            ->hasCommand(LaravelShortcutsCommand::class);
+            ->name('laravel-shortcuts');
+            // ->hasConfigFile()
+            // ->hasViews()
+            // ->hasMigration('create_laravel-shortcuts_table')
+            // ->hasCommand(LaravelShortcutsCommand::class);
     }
 }
