@@ -2,9 +2,9 @@
 
 namespace Bisual\LaravelShortcuts;
 
+use Bisual\LaravelShortcuts\Commands\LaravelShortcutsCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Bisual\LaravelShortcuts\Commands\LaravelShortcutsCommand;
 
 class LaravelShortcutsServiceProvider extends PackageServiceProvider
 {

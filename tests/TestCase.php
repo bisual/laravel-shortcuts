@@ -2,9 +2,9 @@
 
 namespace Bisual\LaravelShortcuts\Tests;
 
+use Bisual\LaravelShortcuts\LaravelShortcutsServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
-use Bisual\LaravelShortcuts\LaravelShortcutsServiceProvider;
 
 class TestCase extends Orchestra
 {
