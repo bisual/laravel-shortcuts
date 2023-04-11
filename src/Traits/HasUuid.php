@@ -4,8 +4,8 @@ namespace Bisual\LaravelShortcuts\Traits;
 
 use Ramsey\Uuid\Uuid;
 
-trait HasUuid {
-
+trait HasUuid
+{
     public static function bootHasUUID()
     {
         static::creating(function ($model) {
@@ -39,6 +39,4 @@ trait HasUuid {
     {
         return static::byUUID($uuid)->first();
     }
-
-
 }
