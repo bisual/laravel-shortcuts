@@ -3,6 +3,7 @@
 namespace Bisual\LaravelShortcuts;
 
 use Illuminate\Database\Eloquent\Model;
+use Bisual\LaravelShortcuts\Traits\HasUuid;
 
 abstract class CrudRepository
 {
@@ -108,17 +109,10 @@ abstract class CrudRepository
         $functionExtraParametersTreatment($clause, $params);
         }
 
-        return $clause->where('id', $id)->firstOrFail();
-    }
-
-    public static function showByUuid($uuid, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
-    {
-        $clause = self::getClause($params, $withoutGlobalScopes);
-        if ($functionExtraParametersTreatment != null) {
-        $functionExtraParametersTreatment($clause, $params);
+        if(!is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
+            return $clause->byUUID($id)->firstOrFail();
         }
-
-        return $clause->where((static::$model)::UUID, $uuid)->firstOrFail();
+        else return $clause->where('id', $id)->firstOrFail();
     }
 
     public static function store(array $data)
@@ -128,11 +122,7 @@ abstract class CrudRepository
 
     public static function update($model, $params)
     {
-        if (is_numeric($model)) {
         $model = self::show($model);
-        } elseif (is_string($model)) {
-        $model = self::showByUuid($model);
-        }
 
         $model->update($params);
 
@@ -141,11 +131,7 @@ abstract class CrudRepository
 
     public static function destroy($model, $functionExtraParametersTreatment = null)
     {
-        if (is_numeric($model)) {
         $model = self::show($model);
-        } elseif (is_string($model)) {
-        $model = self::showByUuid($model);
-        }
 
         if ($functionExtraParametersTreatment != null) {
         $functionExtraParametersTreatment($model->id);
