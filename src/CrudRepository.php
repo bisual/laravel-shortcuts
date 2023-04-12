@@ -98,7 +98,7 @@ abstract class CrudRepository
 
             return $paginate ? $clause->paginate() : $clause->get();
         } else {
-        return $paginate ? (static::$model)::paginate() : (static::$model)::toSql();
+            return $paginate ? (static::$model)::paginate() : (static::$model)::get();
         }
     }
 
