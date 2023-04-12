@@ -109,6 +109,11 @@ abstract class CrudRepository
         $functionExtraParametersTreatment($clause, $params);
         }
 
+        if($id instanceof static::$model) return $id; // ja li hem passat el model
+
+        if(is_object($id)) $id = $id->id; // per si li hem passat algun altre objecte
+        else if(is_array($id)) $id = $id['id']; // per si li hem passat en array
+
         if(!is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
             return $clause->byUUID($id)->firstOrFail();
         }
