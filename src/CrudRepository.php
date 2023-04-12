@@ -117,7 +117,7 @@ abstract class CrudRepository
         if(!is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
             return $clause->byUUID($id)->firstOrFail();
         } else {
-        return $clause->where('id', $id)->firstOrFail();
+            return $clause->where('id', $id)->firstOrFail();
         }
     }
 
