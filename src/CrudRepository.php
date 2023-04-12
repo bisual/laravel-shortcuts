@@ -2,8 +2,8 @@
 
 namespace Bisual\LaravelShortcuts;
 
-use Illuminate\Database\Eloquent\Model;
 use Bisual\LaravelShortcuts\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
 
 abstract class CrudRepository
 {
@@ -116,8 +116,9 @@ abstract class CrudRepository
 
         if(!is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
             return $clause->byUUID($id)->firstOrFail();
+        } else {
+        return $clause->where('id', $id)->firstOrFail();
         }
-        else return $clause->where('id', $id)->firstOrFail();
     }
 
     public static function store(array $data)
