@@ -4,7 +4,8 @@ namespace Bisual\LaravelShortcuts;
 
 class Helper
 {
-    public static function replaceTextVariablesByRegex(string $template, string $pattern, string $model) {
+    public static function replaceTextVariablesByRegex(string $template, string $pattern, string $model)
+    {
         preg_match_all($pattern, $template, $values);
         $variables_to_replace = $values[1];
 
@@ -14,10 +15,12 @@ class Helper
                 try {
                     $s = $model::show($variable)->value;
                 } catch (\Exception $e) {
-                    $s = "";
+                    $s = '';
                 }
+
                 return $s;
             }
+
             return $matches[0];
         }, $template);
 
