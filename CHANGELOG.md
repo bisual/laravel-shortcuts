@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.0.10 - 2023-05-30
+
+### What's Changed
+
+- Bump dependabot/fetch-metadata from 1.4.0 to 1.5.1 by @dependabot in https://github.com/bisual/laravel-shortcuts/pull/3
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.0.9...v0.0.10
+
 ## v0.0.9 - 2023-04-25
 
 ### What's Changed
