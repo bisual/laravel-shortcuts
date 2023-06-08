@@ -7,6 +7,10 @@ class ControllerValidationHelper
     private static $defaultValidationParameters = [
         'with' => 'string',
         'without' => 'string',
+        'order_by' => 'string|nullable',
+        'order_by_direction' => 'string|nullable',
+        'per_page' => 'integer|nullable',
+        'page' => 'integer|nullable'
     ];
 
     public static function indexQueryParametersValidation(array $params = [])

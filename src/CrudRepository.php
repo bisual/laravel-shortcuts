@@ -17,6 +17,11 @@ abstract class CrudRepository
      */
     public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
     {
+        $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
+        unset($params['per_page']);
+        $page = $params['page'] ?? 1; // Obtener el número de página, predeterminado a 1
+        unset($params['page']);
+
         if (count($params) > 0) {
             $clause = (static::$model)::query();
 
@@ -32,6 +37,20 @@ abstract class CrudRepository
             if (array_key_exists('without', $params)) {
                 $without = $params['without'];
                 unset($params['without']);
+            }
+
+            // Order by
+            $orderBy = null;
+            if (array_key_exists('order_by', $params)) {
+                $orderBy = $params['order_by'];
+                unset($params['order_by']);
+            }
+
+            // Order by direction
+            $orderByDirection = null;
+            if (array_key_exists('order_by_direction', $params)) {
+                $orderByDirection = $params['order_by_direction'];
+                unset($params['order_by_direction']);
             }
 
             // Extra parameters treatment
@@ -87,7 +106,12 @@ abstract class CrudRepository
                 }
             }
 
-            $data = $paginate ? $clause->paginate() : $clause->get();
+            // Process Order by
+            if ($orderBy) {
+                $clause->orderBy($orderBy, $orderByDirection ?? 'asc');
+            }
+
+            $data = $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
 
             return $data;
         } elseif ($functionExtraParametersTreatment != null) {
@@ -96,9 +120,9 @@ abstract class CrudRepository
                 $functionExtraParametersTreatment($clause, $params);
             }
 
-            return $paginate ? $clause->paginate() : $clause->get();
+            return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         } else {
-            return $paginate ? (static::$model)::paginate() : (static::$model)::get();
+            return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
         }
     }
 
