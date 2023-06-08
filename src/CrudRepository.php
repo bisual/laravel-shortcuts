@@ -55,7 +55,7 @@ abstract class CrudRepository
 
             // Extra parameters treatment
             if ($functionExtraParametersTreatment != null) {
-            $functionExtraParametersTreatment($clause, $params);
+                $functionExtraParametersTreatment($clause, $params);
             }
 
             $whereClause = [];
@@ -94,7 +94,7 @@ abstract class CrudRepository
                             $q->select('id', $arr_w[1]); // p.e. select 'user'.'user_uuid'
                         }]);
                     } else {
-                    $clause->with($w);
+                        $clause->with($w);
                     }
                 }
             }
@@ -130,18 +130,18 @@ abstract class CrudRepository
     {
         $clause = self::getClause($params, $withoutGlobalScopes);
         if ($functionExtraParametersTreatment != null) {
-        $functionExtraParametersTreatment($clause, $params);
+            $functionExtraParametersTreatment($clause, $params);
         }
 
         if ($id instanceof static::$model) {
-        return $id;
+            return $id;
         } // ja li hem passat el model
 
         if (is_object($id)) {
-        $id = $id->id;
+            $id = $id->id;
         } // per si li hem passat algun altre objecte
         elseif (is_array($id)) {
-        $id = $id['id'];
+            $id = $id['id'];
         } // per si li hem passat en array
 
         if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
@@ -170,7 +170,7 @@ abstract class CrudRepository
         $model = self::show($model);
 
         if ($functionExtraParametersTreatment != null) {
-        $functionExtraParametersTreatment($model->id);
+            $functionExtraParametersTreatment($model->id);
         }
 
         $model->delete();
