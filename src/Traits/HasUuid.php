@@ -14,6 +14,11 @@ trait HasUuid
                 $model->$uuidFieldName = static::generateUUID();
             }
         });
+
+        static::retrieved(function ($model) {
+            $model->incrementing = false;
+            $model->keyType = 'string';
+        });
     }
 
     public function getUUIDFieldName()
