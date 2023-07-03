@@ -9,6 +9,9 @@ trait HasUuid
     public static function bootHasUUID()
     {
         static::creating(function ($model) {
+            $model->incrementing = false;
+            $model->keyType = 'string';
+
             $uuidFieldName = $model->getUUIDFieldName();
             if (empty($model->$uuidFieldName)) {
                 $model->$uuidFieldName = static::generateUUID();
