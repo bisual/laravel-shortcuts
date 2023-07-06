@@ -137,7 +137,7 @@ abstract class CrudRepository
         if ($id instanceof static::$model) {
             return $id;
         } // ja li hem passat el model
-        else if (is_object($id)) {
+        elseif (is_object($id)) {
             $id = $id->id;
         } // per si li hem passat algun altre objecte
         elseif (is_array($id)) {
@@ -150,8 +150,8 @@ abstract class CrudRepository
             $clause->where(App::make(static::$model)->getKeyName(), $id);
         }
 
-        if(isset($params['with']) && $params['with']!="") {
-            $clause->with(explode(",", $params['with']));
+        if (isset($params['with']) && $params['with'] != '') {
+            $clause->with(explode(',', $params['with']));
         }
 
         return $clause->firstOrFail();
