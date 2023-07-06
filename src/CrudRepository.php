@@ -137,8 +137,7 @@ abstract class CrudRepository
         if ($id instanceof static::$model) {
             return $id;
         } // ja li hem passat el model
-
-        if (is_object($id)) {
+        else if (is_object($id)) {
             $id = $id->id;
         } // per si li hem passat algun altre objecte
         elseif (is_array($id)) {
@@ -146,10 +145,16 @@ abstract class CrudRepository
         } // per si li hem passat en array
 
         if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
-            return $clause->byUUID($id)->firstOrFail();
+            $clause->byUUID($id);
         } else {
-            return $clause->where(App::make(static::$model)->getKeyName(), $id)->firstOrFail();
+            $clause->where(App::make(static::$model)->getKeyName(), $id);
         }
+
+        if(isset($params['with']) && $params['with']!="") {
+            $clause->with(explode(",", $params['with']));
+        }
+
+        return $clause->firstOrFail();
     }
 
     public static function store(array $data)
