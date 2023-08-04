@@ -154,7 +154,15 @@ abstract class CrudRepository
             $clause->with(explode(',', $params['with']));
         }
 
-        return $clause->firstOrFail();
+        $model = $clause->firstOrFail();
+
+        if(isset($params['append']) && $params['append'] != '') {
+            foreach(explode(',', $params['append']) as $append) {
+                $model->append($append);
+            }
+        }
+
+        return $model;
     }
 
     public static function store(array $data)
