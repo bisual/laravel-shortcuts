@@ -2,6 +2,10 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.0.18 - 2023-08-10
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.0.17...v0.0.18
+
 ## v0.0.17 - 2023-08-04
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.0.16...v0.0.17
