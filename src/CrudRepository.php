@@ -159,8 +159,8 @@ abstract class CrudRepository
 
         $model = $clause->firstOrFail();
 
-        if(isset($params['append']) && $params['append'] != '') {
-            foreach(explode(',', $params['append']) as $append) {
+        if (isset($params['append']) && $params['append'] != '') {
+            foreach (explode(',', $params['append']) as $append) {
                 $model->append($append);
             }
         }
