@@ -68,14 +68,15 @@ abstract class CrudRepository
                             $relations = implode('.', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
                             $clause->whereHas($relations, function ($q) use ($attribute, $val) {
-                                if($val === null || $val === 'null') $q->whereNull($attribute);
-                                else if (is_numeric($val) || ($val === true || $val === false)) {
+                                if ($val === null || $val === 'null') {
+                                    $q->whereNull($attribute);
+                                } elseif (is_numeric($val) || ($val === true || $val === false)) {
                                     $q->where($attribute, $val);
                                 } else {
                                     $q->where($attribute, 'like', "%$val%");
                                 }
                             });
-                        } else if($val === null || $val === 'null') {
+                        } elseif ($val === null || $val === 'null') {
                             array_push($whereClause, [$attr, null]); // $q->whereNull($attribute);
                         } elseif (is_numeric($val) || is_bool($val)) {
                             array_push($whereClause, [$attr, $val]);
