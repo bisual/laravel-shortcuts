@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\Cache;
  *      4. Create an async structure (Async Job or Event) that dispatches
  *      5. Add the execution of a Dispatchable Job created in step 4 on Business Logic Layer (such as Repository or Service)
  */
-abstract class AbstractPrecalculatedModel {
-
+abstract class AbstractPrecalculatedModel
+{
     // la template de la key sin parámetros aplicados. Las variables serán envueltas entre doble claudators: {{var}} . Ejemplo: "ecommerce_total_last_30_days_branch_{{branch_id}}"
     protected static string $BASE_KEY_TEMPLATE;
 
@@ -26,7 +26,8 @@ abstract class AbstractPrecalculatedModel {
     // We save $params for query purposes
     protected array $params;
 
-    public final function __construct(array $params) {
+    final public function __construct(array $params)
+    {
         $this->params = $params;
         $this->base_key = $this->createKey($params);
     }
@@ -44,32 +45,39 @@ abstract class AbstractPrecalculatedModel {
     /**
      * PUBLIC METHODS
      */
-    final public function get(): array {
-        if(!$this->check()) $this->refresh();
+    final public function get(): array
+    {
+        if (! $this->check()) {
+            $this->refresh();
+        }
 
         return json_decode(Cache::get($this->getDataKey()), true);
     }
 
-    final public function check(): bool {
+    final public function check(): bool
+    {
         return Cache::has($this->getDataKey());
     }
 
-    final public function getUpdatedAt(): Carbon {
+    final public function getUpdatedAt(): Carbon
+    {
         return Carbon::createFromTimestamp(Cache::get($this->getUpdatedAtKey()));
     }
 
     /**
      * PROTECTED METHODS
      */
-    final protected function set(array $data): void {
+    final protected function set(array $data): void
+    {
         Cache::set($this->getDataKey(), json_encode($data));
         Cache::set($this->getUpdatedAtKey(), Carbon::now()->timestamp);
     }
 
-    final protected function generateDaysArray(Carbon $from, Carbon $to) {
+    final protected function generateDaysArray(Carbon $from, Carbon $to)
+    {
         $res = [];
         $it = $from->copy();
-        while($it <= $to) {
+        while ($it <= $to) {
             $res[] = 0;
             $it->addDay();
         }
@@ -80,16 +88,23 @@ abstract class AbstractPrecalculatedModel {
     /**
      * PRIVATE METHODS
      */
-    final private function getDataKey() { return $this->base_key . "_data"; }
-
-    final private function getUpdatedAtKey() { return $this->base_key . "_updated_at"; }
-
-    final static private function createKey(array $params) {
-        $res = self::$BASE_KEY_TEMPLATE;
-        foreach($params as $key => $val) {
-            $res = str_replace("{{$key}}", $val, $res);
-        }
-        return $res;
+    final private function getDataKey()
+    {
+        return $this->base_key.'_data';
     }
 
+    final private function getUpdatedAtKey()
+    {
+        return $this->base_key.'_updated_at';
+    }
+
+    final private static function createKey(array $params)
+    {
+        $res = self::$BASE_KEY_TEMPLATE;
+        foreach ($params as $key => $val) {
+            $res = str_replace("{{$key}}", $val, $res);
+        }
+
+        return $res;
+    }
 }
