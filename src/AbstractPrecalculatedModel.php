@@ -88,16 +88,23 @@ abstract class AbstractPrecalculatedModel
     /**
      * PRIVATE METHODS
      */
-    private function getDataKey() { return $this->base_key . "_data"; }
-
-    private function getUpdatedAtKey() { return $this->base_key . "_updated_at"; }
-
-    private static function createKey(array $params) {
-        $res = static::$BASE_KEY_TEMPLATE;
-        foreach($params as $key => $val) {
-            $res = str_replace("{{{$key}}}", $val, $res);
-        }
-        return $res;
+    private function getDataKey()
+    {
+        return $this->base_key.'_data';
     }
 
+    private function getUpdatedAtKey()
+    {
+        return $this->base_key.'_updated_at';
+    }
+
+    private static function createKey(array $params)
+    {
+        $res = static::$BASE_KEY_TEMPLATE;
+        foreach ($params as $key => $val) {
+            $res = str_replace("{{{$key}}}", $val, $res);
+        }
+
+        return $res;
+    }
 }
