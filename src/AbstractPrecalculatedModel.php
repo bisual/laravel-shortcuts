@@ -37,7 +37,10 @@ abstract class AbstractPrecalculatedModel
      */
 
     // Refreshes the whole model
-    abstract public function refresh();
+    public final function refresh() {
+        $data = $this->calc();
+        $this->set($data);
+    }
 
     // Adds a new iteration without having to refresh the whole model
     abstract public function add(array $array);
@@ -54,6 +57,10 @@ abstract class AbstractPrecalculatedModel
         return json_decode(Cache::get($this->getDataKey()), true);
     }
 
+    final public function getWithoutCache(array $params): array {
+        return $this->calc($params);
+    }
+
     final public function check(): bool
     {
         return Cache::has($this->getDataKey());
@@ -67,6 +74,13 @@ abstract class AbstractPrecalculatedModel
     /**
      * PROTECTED METHODS
      */
+
+    /**
+     * Calculates and returns the new data
+     * @param $params is used for when is called from getWithoutCache() function
+     */
+    abstract protected function calc(array $params = null): array;
+
     final protected function set(array $data): void
     {
         Cache::set($this->getDataKey(), json_encode($data));
