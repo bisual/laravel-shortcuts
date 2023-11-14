@@ -96,7 +96,7 @@ abstract class CrudRepository
              *      - relation..relation2
              *      - relation..relation2.atribute
              */
-            if($with) {
+            if ($with) {
                 self::handleWith($clause, $with);
             }
 
@@ -214,7 +214,8 @@ abstract class CrudRepository
      *      - relation..relation2
      *      - relation..relation2.atribute
      */
-    private static function handleWith(&$clause, string $with) {
+    private static function handleWith(&$clause, string $with)
+    {
         foreach (explode(',', $with) as $w) {
             $arr_w = explode('.', $w);
             if (! str_contains($w, '..') && count($arr_w) == 2) {
