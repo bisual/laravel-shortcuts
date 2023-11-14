@@ -89,17 +89,24 @@ abstract class CrudRepository
 
             $clause = $clause->where($whereClause);
 
-            // Process With
+            /**
+             * Process With
+             *  - array $with
+             *      - relation.attribute
+             *      - relation..relation2
+             *      - relation..relation2.atribute
+             */
             if ($with) {
                 foreach (explode(',', $with) as $w) {
                     $arr_w = explode('.', $w);
-                    if (count($arr_w) == 2) {
+                    if (!str_contains($w, "..") && count($arr_w) == 2) {
                         $clause->with([$arr_w[0] => function ($q) use ($arr_w) {
                             // Esta la ID por esto: https://stackoverflow.com/questions/19852927/get-specific-columns-using-with-function-in-laravel-eloquent
                             $q->select('id', $arr_w[1]); // p.e. select 'user'.'user_uuid'
                         }]);
                     } else {
-                        $clause->with($w);
+                        $w_cleaned = str_replace("..", ".", $w);
+                        $clause->with($w_cleaned);
                     }
                 }
             }
