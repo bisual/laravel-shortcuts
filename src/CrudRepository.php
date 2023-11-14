@@ -96,19 +96,8 @@ abstract class CrudRepository
              *      - relation..relation2
              *      - relation..relation2.atribute
              */
-            if ($with) {
-                foreach (explode(',', $with) as $w) {
-                    $arr_w = explode('.', $w);
-                    if (! str_contains($w, '..') && count($arr_w) == 2) {
-                        $clause->with([$arr_w[0] => function ($q) use ($arr_w) {
-                            // Esta la ID por esto: https://stackoverflow.com/questions/19852927/get-specific-columns-using-with-function-in-laravel-eloquent
-                            $q->select('id', $arr_w[1]); // p.e. select 'user'.'user_uuid'
-                        }]);
-                    } else {
-                        $w_cleaned = str_replace('..', '.', $w);
-                        $clause->with($w_cleaned);
-                    }
-                }
+            if($with) {
+                self::handleWith($clause, $with);
             }
 
             // Process Without
@@ -162,7 +151,7 @@ abstract class CrudRepository
         }
 
         if (isset($params['with']) && $params['with'] != '') {
-            $clause->with(explode(',', $params['with']));
+            self::handleWith($clause, $params['with']);
         }
 
         $model = $clause->firstOrFail();
@@ -212,9 +201,31 @@ abstract class CrudRepository
         if (isset($params['with'])) {
             $with = $params['with'];
             unset($params['with']);
-            $clause = $clause->with(explode(',', $with));
+            self::handleWith($clause, $with);
         }
 
         return $clause;
+    }
+
+    /**
+     * Process With
+     *  - array $with
+     *      - relation.attribute
+     *      - relation..relation2
+     *      - relation..relation2.atribute
+     */
+    private static function handleWith(&$clause, string $with) {
+        foreach (explode(',', $with) as $w) {
+            $arr_w = explode('.', $w);
+            if (! str_contains($w, '..') && count($arr_w) == 2) {
+                $clause->with([$arr_w[0] => function ($q) use ($arr_w) {
+                    // Esta la ID por esto: https://stackoverflow.com/questions/19852927/get-specific-columns-using-with-function-in-laravel-eloquent
+                    $q->select('id', $arr_w[1]); // p.e. select 'user'.'user_uuid'
+                }]);
+            } else {
+                $w_cleaned = str_replace('..', '.', $w);
+                $clause->with($w_cleaned);
+            }
+        }
     }
 }
