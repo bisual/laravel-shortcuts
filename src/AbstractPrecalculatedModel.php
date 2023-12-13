@@ -82,7 +82,7 @@ abstract class AbstractPrecalculatedModel
      *
      * @param $params is used for when is called from getWithoutCache() function
      */
-    abstract protected function calc(array $params = null): array;
+    abstract protected function calc(?array $params = null): array;
 
     final protected function set(array $data): void
     {
