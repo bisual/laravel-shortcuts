@@ -54,6 +54,13 @@ abstract class CrudRepository
                 unset($params['order_by_direction']);
             }
 
+            // Append
+            $append = null;
+            if(array_key_exists('append', $params)) {
+                $append = $params['append'];
+                unset($params['append']);
+            }
+
             // Extra parameters treatment
             if ($functionExtraParametersTreatment != null) {
                 $functionExtraParametersTreatment($clause, $params);
@@ -96,7 +103,7 @@ abstract class CrudRepository
              *      - relation..relation2
              *      - relation..relation2.atribute
              */
-            if ($with) {
+            if($with) {
                 self::handleWith($clause, $with);
             }
 
@@ -113,6 +120,14 @@ abstract class CrudRepository
             }
 
             $data = $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
+
+            if($append != null) {
+                foreach($data as $model) {
+                    foreach (explode(',', $append) as $append_item) {
+                        $model->append($append_item);
+                    }
+                }
+            }
 
             return $data;
         } elseif ($functionExtraParametersTreatment != null) {
