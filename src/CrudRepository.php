@@ -57,7 +57,7 @@ abstract class CrudRepository
 
             // Append
             $append = null;
-            if(array_key_exists('append', $params)) {
+            if (array_key_exists('append', $params)) {
                 $append = $params['append'];
                 unset($params['append']);
             }
@@ -78,8 +78,8 @@ abstract class CrudRepository
                             $clause->whereHas($relations, function ($q) use ($attribute, $val) {
                                 if ($val === null || $val === 'null') {
                                     $q->whereNull($attribute);
-                                } else if(str_contains($val, ",")) {
-                                    $q->whereIn($attribute, explode(",", $val));
+                                } elseif (str_contains($val, ',')) {
+                                    $q->whereIn($attribute, explode(',', $val));
                                 } elseif (is_numeric($val) || ($val === true || $val === false)) {
                                     $q->where($attribute, $val);
                                 } else {
@@ -88,8 +88,8 @@ abstract class CrudRepository
                             });
                         } elseif ($val === null || $val === 'null') {
                             array_push($whereClause, [$attr, null]); // $q->whereNull($attribute);
-                        } else if(str_contains($val, ",")) {
-                            array_push($whereClause, [$attr, explode(",", $val)]);
+                        } elseif (str_contains($val, ',')) {
+                            array_push($whereClause, [$attr, explode(',', $val)]);
                         } elseif (is_numeric($val) || is_bool($val)) {
                             array_push($whereClause, [$attr, $val]);
                         } else {
@@ -108,7 +108,7 @@ abstract class CrudRepository
              *      - relation..relation2
              *      - relation..relation2.atribute
              */
-            if($with) {
+            if ($with) {
                 self::handleWith($clause, $with);
             }
 
@@ -126,8 +126,8 @@ abstract class CrudRepository
 
             $data = $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
 
-            if($append != null) {
-                foreach($data as $model) {
+            if ($append != null) {
+                foreach ($data as $model) {
                     foreach (explode(',', $append) as $append_item) {
                         $model->append($append_item);
                     }
