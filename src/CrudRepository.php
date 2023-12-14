@@ -24,7 +24,7 @@ abstract class CrudRepository
         unset($params['page']);
         unset($params['total']);
         $limit = null;
-        if(isset($params['limit'])) {
+        if (isset($params['limit'])) {
             $limit = $params['limit'];
             unset($params['limit']);
         }
@@ -129,11 +129,12 @@ abstract class CrudRepository
                 $clause->orderBy($orderBy, $orderByDirection ?? 'asc');
             }
 
-            if($paginate) {
+            if ($paginate) {
                 $data = $clause->paginate($perPage, ['*'], 'page', $page);
-            }
-            else {
-                if($limit) $clause->limit($limit);
+            } else {
+                if ($limit) {
+                    $clause->limit($limit);
+                }
                 $data = $clause->get();
             }
 
