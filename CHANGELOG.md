@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.0.25 - 2023-12-14
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.0.24...v0.0.25
+
+- index() working with "IN" and querying through relationships
+
 ## v0.0.24 - 2023-12-13
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.0.23...v0.0.24
