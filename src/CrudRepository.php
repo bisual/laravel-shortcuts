@@ -80,15 +80,16 @@ abstract class CrudRepository
                             $separate = explode('-', $attr);
                             $relations = implode('-', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
-                            $clause->whereHas($relations, function ($q) use ($attribute, $val) {
+                            $table = (new static::$model)->$relations()->getRelated()->getTable();
+                            $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table) {
                                 if ($val === null || $val === 'null') {
-                                    $q->whereNull($attribute);
+                                    $q->whereNull($table . "." . $attribute);
                                 } elseif (str_contains($val, ',')) {
-                                    $q->whereIn($attribute, explode(',', $val));
+                                    $q->whereIn($table . "." . $attribute, explode(',', $val));
                                 } elseif (is_numeric($val) || ($val === true || $val === false)) {
-                                    $q->where($attribute, $val);
+                                    $q->where($table . "." . $attribute, $val);
                                 } else {
-                                    $q->where($attribute, 'like', "%$val%");
+                                    $q->where($table . "." . $attribute, 'like', "%$val%");
                                 }
                             });
                         } elseif ($val === null || $val === 'null') {
