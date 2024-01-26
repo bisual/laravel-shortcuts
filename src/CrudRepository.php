@@ -3,6 +3,7 @@
 namespace Bisual\LaravelShortcuts;
 
 use Bisual\LaravelShortcuts\Traits\HasUuid;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 
@@ -74,6 +75,7 @@ abstract class CrudRepository
 
             $whereClause = [];
             if (count($params) > 0) {
+                $model_inst = (new static::$model);
                 foreach ($params as $attr => $val) {
                     if ($val !== null && $val !== '') {
                         if (str_contains($attr, '-')) {
@@ -81,7 +83,7 @@ abstract class CrudRepository
                             $relations = implode('-', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
                             $table = (new static::$model)->$relations()->getRelated()->getTable();
-                            $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table) {
+                            $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table, &$model_inst) {
                                 if ($val === null || $val === 'null') {
                                     $q->whereNull($table.'.'.$attribute);
                                 } elseif (str_contains($val, ',')) {
@@ -98,6 +100,8 @@ abstract class CrudRepository
                             array_push($whereClause, [$attr, explode(',', $val)]);
                         } elseif (is_numeric($val) || is_bool($val)) {
                             array_push($whereClause, [$attr, $val]);
+                        } else if($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
+                            $clause->whereDate($attr, Carbon::parse($val));
                         } else {
                             array_push($whereClause, [$attr, 'like', "%$val%"]);
                         }
