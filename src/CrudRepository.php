@@ -100,7 +100,7 @@ abstract class CrudRepository
                             array_push($whereClause, [$attr, explode(',', $val)]);
                         } elseif (is_numeric($val) || is_bool($val)) {
                             array_push($whereClause, [$attr, $val]);
-                        } else if($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
+                        } elseif ($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
                             $clause->whereDate($attr, Carbon::parse($val));
                         } else {
                             array_push($whereClause, [$attr, 'like', "%$val%"]);

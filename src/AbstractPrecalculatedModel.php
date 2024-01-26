@@ -80,7 +80,7 @@ abstract class AbstractPrecalculatedModel
     /**
      * Calculates and returns the new data
      *
-     * @param $params is used for when is called from getWithoutCache() function
+     * @param  $params  is used for when is called from getWithoutCache() function
      */
     abstract protected function calc(?array $params = null): array;
 
