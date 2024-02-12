@@ -2,6 +2,10 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.0.29 - 2024-02-12
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.0.28...v0.0.29
+
 ## v0.0.28 - 2024-01-26
 
 - Index() method from CrudRepository will now automatically handle date-casted attributes and filter them using Eloquent's whereDate() method.
