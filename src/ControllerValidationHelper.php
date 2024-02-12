@@ -7,6 +7,7 @@ class ControllerValidationHelper
     private static $defaultValidationParameters = [
         'with' => 'string',
         'without' => 'string',
+        'append' => 'string',
         'order_by' => 'string|nullable',
         'order_by_direction' => 'string|nullable',
         'per_page' => 'integer|nullable',
