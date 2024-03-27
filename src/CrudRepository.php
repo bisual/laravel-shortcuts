@@ -171,7 +171,7 @@ abstract class CrudRepository
             $functionExtraParametersTreatment($clause, $params);
         }
 
-        if ($id instanceof static::$model) {
+        if ($id instanceof static::$model && sizeof($params) == 0) {
             return $id;
         } // ja li hem passat el model
         elseif (is_object($id)) {
