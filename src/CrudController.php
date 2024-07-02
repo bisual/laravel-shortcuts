@@ -24,12 +24,14 @@ abstract class CrudController extends BaseController
 
     public static $updateRequestClass = Request::class;
 
-    public function index(Request $request)
+    public function index(Request $request, $functionExtraParametersTreatment = null)
     {
         if (static::$authorize) {
             $this->authorize('viewAny', static::$model);
         }
         $params = ControllerValidationHelper::indexQueryParametersValidation($request->query());
+
+        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($params);
 
         return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
     }
@@ -44,7 +46,7 @@ abstract class CrudController extends BaseController
         return response()->json($item);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, $functionExtraParametersTreatment = null)
     {
         if (static::$authorize) {
             $this->authorize('create', static::$model);
@@ -56,10 +58,12 @@ abstract class CrudController extends BaseController
             $data = $request->all();
         }
 
+        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($data);
+
         return response()->json((static::$repository)::store($data));
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, $functionExtraParametersTreatment = null)
     {
         $item = (static::$repository)::show($id);
         if (static::$authorize) {
@@ -72,15 +76,19 @@ abstract class CrudController extends BaseController
             $data = $request->all();
         }
 
+        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($item, $data);
+
         return response()->json((static::$repository)::update($item, $data));
     }
 
-    public function destroy(Request $request, $id)
+    public function destroy(Request $request, $id, $functionExtraParametersTreatment = null)
     {
         $item = (static::$repository)::show($id);
         if (static::$authorize) {
             $this->authorize('delete', $item);
         }
+
+        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($item);
 
         return response()->json((static::$repository)::destroy($item));
     }
