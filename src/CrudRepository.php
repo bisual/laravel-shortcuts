@@ -88,7 +88,7 @@ abstract class CrudRepository
                                     $q->whereNull($table.'.'.$attribute);
                                 } elseif (str_contains($val, ',')) {
                                     $q->whereIn($table.'.'.$attribute, explode(',', $val));
-                                } elseif (is_numeric($val) || ($val === true || $val === false)) {
+                                } elseif (is_numeric($val) || is_bool($val) || $val == "false" || $val == "true") {
                                     $q->where($table.'.'.$attribute, $val);
                                 } else {
                                     $q->where($table.'.'.$attribute, 'like', "%$val%");
@@ -98,7 +98,7 @@ abstract class CrudRepository
                             array_push($whereClause, [$attr, null]); // $q->whereNull($attribute);
                         } elseif (str_contains($val, ',')) {
                             array_push($whereClause, [$attr, explode(',', $val)]);
-                        } elseif (is_numeric($val) || is_bool($val)) {
+                        } elseif (is_numeric($val) || is_bool($val) || $val == "false" || $val == "true") {
                             array_push($whereClause, [$attr, $val]);
                         } elseif ($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
                             $clause->whereDate($attr, Carbon::parse($val));
@@ -171,7 +171,7 @@ abstract class CrudRepository
             $functionExtraParametersTreatment($clause, $params);
         }
 
-        if ($id instanceof static::$model && count($params) == 0) {
+        if ($id instanceof static::$model) {
             return $id;
         } // ja li hem passat el model
         elseif (is_object($id)) {
