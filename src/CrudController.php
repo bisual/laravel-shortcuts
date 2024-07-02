@@ -31,7 +31,9 @@ abstract class CrudController extends BaseController
         }
         $params = ControllerValidationHelper::indexQueryParametersValidation($request->query());
 
-        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($params);
+        if ($functionExtraParametersTreatment != null) {
+            $functionExtraParametersTreatment($params);
+        }
 
         return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
     }
@@ -58,7 +60,9 @@ abstract class CrudController extends BaseController
             $data = $request->all();
         }
 
-        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($data);
+        if ($functionExtraParametersTreatment != null) {
+            $functionExtraParametersTreatment($data);
+        }
 
         return response()->json((static::$repository)::store($data));
     }
@@ -76,7 +80,9 @@ abstract class CrudController extends BaseController
             $data = $request->all();
         }
 
-        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($item, $data);
+        if ($functionExtraParametersTreatment != null) {
+            $functionExtraParametersTreatment($item, $data);
+        }
 
         return response()->json((static::$repository)::update($item, $data));
     }
@@ -88,7 +94,9 @@ abstract class CrudController extends BaseController
             $this->authorize('delete', $item);
         }
 
-        if($functionExtraParametersTreatment != null) $functionExtraParametersTreatment($item);
+        if ($functionExtraParametersTreatment != null) {
+            $functionExtraParametersTreatment($item);
+        }
 
         return response()->json((static::$repository)::destroy($item));
     }
