@@ -55,7 +55,7 @@ abstract class CrudController extends BaseController
         }
 
         if (static::$storeRequestClass !== 'Illuminate\Http\Request') {
-            $data = $request->validate((new static::$storeRequestClass())->rules());
+            $data = $request->validate((new static::$storeRequestClass)->rules());
         } else {
             $data = $request->all();
         }
@@ -75,7 +75,7 @@ abstract class CrudController extends BaseController
         }
 
         if (static::$updateRequestClass !== 'Illuminate\Http\Request') {
-            $data = $request->validate((new static::$updateRequestClass())->rules());
+            $data = $request->validate((new static::$updateRequestClass)->rules());
         } else {
             $data = $request->all();
         }
