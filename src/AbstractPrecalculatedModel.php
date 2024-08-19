@@ -4,6 +4,8 @@ namespace Bisual\LaravelShortcuts;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+
 
 /**
  * HOW TO USE ABSTRACTPRECALCULATEDMODEL
@@ -86,8 +88,15 @@ abstract class AbstractPrecalculatedModel
 
     final protected function set(array $data): void
     {
-        Cache::set($this->getDataKey(), json_encode($data));
-        Cache::set($this->getUpdatedAtKey(), Carbon::now()->timestamp);
+        retry(5, function () use ($data) { // retry for 5 times
+            Log::debug(get_class($this) . " - Set() attempt");
+            Cache::set($this->getDataKey(), json_encode($data));
+            Cache::set($this->getUpdatedAtKey(), Carbon::now()->timestamp);
+            Log::debug(get_class($this) . " - Set() attempt successful");
+        }, 15000, function ($exception) {
+            Log::error(get_class($this) . " - Exception during attempt: " . $exception->getMessage());
+            return $exception;
+        }); // 15s waiting to try again
     }
 
     final protected function generateDaysArray(Carbon $from, Carbon $to)
