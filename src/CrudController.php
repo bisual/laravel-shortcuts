@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Controller as BaseController;
 
@@ -29,7 +30,7 @@ abstract class CrudController extends BaseController
         if (static::$authorize) {
             $this->authorize('viewAny', static::$model);
         }
-        $params = ControllerValidationHelper::indexQueryParametersValidation($request->query());
+        $params = Validator::make($request->query(),ControllerValidationHelper::indexQueryParametersValidation($request->query()))->validate();
 
         if ($functionExtraParametersTreatment != null) {
             $functionExtraParametersTreatment($params);
