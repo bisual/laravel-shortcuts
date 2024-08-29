@@ -30,7 +30,7 @@ abstract class CrudController extends BaseController
         if (static::$authorize) {
             $this->authorize('viewAny', static::$model);
         }
-        $params = Validator::make($request->query(),ControllerValidationHelper::indexQueryParametersValidation())->validate();
+        $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation())->validate();
 
         if ($functionExtraParametersTreatment != null) {
             $functionExtraParametersTreatment($params);
