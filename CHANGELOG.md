@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.2.6 - 2024-10-17
+
+- Breaking feature: CrudController: $authorize to array
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.2.5...v0.2.6
+
 ## v0.2.5 - 2024-10-17
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.2.4...v0.2.5
