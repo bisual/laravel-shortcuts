@@ -21,9 +21,9 @@ abstract class CrudController extends BaseController
 
     public static bool $authorize = true;
 
-    public static $storeRequestClass = Request::class;
+    public static $storeRequestClass = Request::class; // pot ser un array de validacions també
 
-    public static $updateRequestClass = Request::class;
+    public static $updateRequestClass = Request::class; // pot ser un array de validacions també
 
     public function index(Request $request, $functionExtraParametersTreatment = null)
     {
@@ -57,7 +57,11 @@ abstract class CrudController extends BaseController
 
         if (static::$storeRequestClass !== 'Illuminate\Http\Request') {
             $data = $request->validate((new static::$storeRequestClass)->rules());
-        } else {
+        }
+        else if(is_array(static::$storeRequestClass)) {
+            $data = $request->validate(static::$storeRequestClass);
+        }
+        else {
             $data = $request->all();
         }
 
@@ -77,7 +81,11 @@ abstract class CrudController extends BaseController
 
         if (static::$updateRequestClass !== 'Illuminate\Http\Request') {
             $data = $request->validate((new static::$updateRequestClass)->rules());
-        } else {
+        }
+        else if(is_array(static::$updateRequestClass)) {
+            $data = $request->validate(static::$updateRequestClass);
+        }
+        else {
             $data = $request->all();
         }
 
