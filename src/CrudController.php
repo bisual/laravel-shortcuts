@@ -19,7 +19,13 @@ abstract class CrudController extends BaseController
 
     public static $model = Model::class;
 
-    public static bool $authorize = true;
+    public static array $authorize = [
+        "index" => true,
+        "show" => true,
+        "store" => true,
+        "update" => true,
+        "destroy" => true,
+    ];
 
     public static $storeRequestClass = Request::class; // pot ser un array de validacions també
 
@@ -27,7 +33,7 @@ abstract class CrudController extends BaseController
 
     public function index(Request $request, $functionExtraParametersTreatment = null)
     {
-        if (static::$authorize) {
+        if (static::$authorize['index']) {
             $this->authorize('viewAny', static::$model);
         }
         $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation())->validate();
@@ -42,7 +48,7 @@ abstract class CrudController extends BaseController
     public function show(Request $request, $id)
     {
         $item = static::$repository::show($id, $request->query());
-        if (static::$authorize) {
+        if (static::$authorize['show']) {
             $this->authorize('view', $item);
         }
 
@@ -51,15 +57,17 @@ abstract class CrudController extends BaseController
 
     public function store(Request $request, $functionExtraParametersTreatment = null)
     {
-        if (static::$authorize) {
+        if (static::$authorize['store']) {
             $this->authorize('create', static::$model);
         }
 
         if (static::$storeRequestClass !== 'Illuminate\Http\Request') {
             $data = $request->validate((new static::$storeRequestClass)->rules());
-        } elseif (is_array(static::$storeRequestClass)) {
+        }
+        else if(is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
-        } else {
+        }
+        else {
             $data = $request->all();
         }
 
@@ -73,15 +81,17 @@ abstract class CrudController extends BaseController
     public function update(Request $request, $id, $functionExtraParametersTreatment = null)
     {
         $item = (static::$repository)::show($id);
-        if (static::$authorize) {
+        if (static::$authorize['update']) {
             $this->authorize('update', $item);
         }
 
         if (static::$updateRequestClass !== 'Illuminate\Http\Request') {
             $data = $request->validate((new static::$updateRequestClass)->rules());
-        } elseif (is_array(static::$updateRequestClass)) {
+        }
+        else if(is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
-        } else {
+        }
+        else {
             $data = $request->all();
         }
 
@@ -95,7 +105,7 @@ abstract class CrudController extends BaseController
     public function destroy(Request $request, $id, $functionExtraParametersTreatment = null)
     {
         $item = (static::$repository)::show($id);
-        if (static::$authorize) {
+        if (static::$authorize['destroy']) {
             $this->authorize('delete', $item);
         }
 
