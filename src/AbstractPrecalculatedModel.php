@@ -2,6 +2,7 @@
 
 namespace Bisual\LaravelShortcuts;
 
+use Exception;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -52,10 +53,29 @@ abstract class AbstractPrecalculatedModel
      */
     final public function get(): array
     {
-        if (! $this->check()) {
-            $this->refresh();
+        $maxAttempts = 5;
+        $attempt = 0;
+
+        while ($attempt < $maxAttempts) {
+            try {
+                // Si la clave existe en caché se retorna el valor cacheado
+                if ($this->check()) {
+                    return json_decode(Cache::get($this->getDataKey()), true);
+                }
+
+                // Si la clave no existe, realiza un refresh y termina el bucle
+                $this->refresh();
+                return json_decode(Cache::get($this->getDataKey()), true);
+            } catch (\Exception $e) {
+                Log::error(get_class($this) . " - Error getting data from cache: " . $e->getMessage());
+                $attempt++;
+
+                sleep(1);
+            }
         }
 
+        // Si fallaron todos los intentos, llama a refresh
+        $this->refresh();
         return json_decode(Cache::get($this->getDataKey()), true);
     }
 
