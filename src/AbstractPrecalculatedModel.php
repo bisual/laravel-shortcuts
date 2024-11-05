@@ -2,7 +2,6 @@
 
 namespace Bisual\LaravelShortcuts;
 
-use Exception;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
