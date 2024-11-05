@@ -58,24 +58,30 @@ abstract class AbstractPrecalculatedModel
 
         while ($attempt < $maxAttempts) {
             try {
+                Log::info(get_class($this).' - trying to read key '.$this->getDataKey().' from cache - attempt '. $attempt);
                 // Si la clave existe en caché se retorna el valor cacheado
                 if ($this->check()) {
+                    Log::info(get_class($this).' - successfuly read key '.$this->getDataKey().' from cache in attempt '. $attempt);
                     return json_decode(Cache::get($this->getDataKey()), true);
                 }
 
+                Log::info(get_class($this).' - key '.$this->getDataKey().' is not in cache, refreshing');
                 // Si la clave no existe, realiza un refresh y termina el bucle
                 $this->refresh();
+
                 return json_decode(Cache::get($this->getDataKey()), true);
             } catch (\Exception $e) {
-                Log::error(get_class($this) . " - Error getting data from cache: " . $e->getMessage());
+                Log::error(get_class($this).' - Error getting key '.$this->getDataKey().' from cache: '.$e->getMessage());
                 $attempt++;
 
                 sleep(1);
             }
         }
 
+        Log::info(get_class($this).' - refreshing key '.$this->getDataKey().' from cache after read error');
         // Si fallaron todos los intentos, llama a refresh
         $this->refresh();
+
         return json_decode(Cache::get($this->getDataKey()), true);
     }
 
