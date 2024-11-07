@@ -102,7 +102,7 @@ abstract class CrudRepository
                         } elseif ($val === null || $val === 'null') {
                             array_push($whereClause, [$attr, null]); // $q->whereNull($attribute);
                         } elseif (str_contains($val, ',')) {
-                            array_push($whereClause, [$attr, explode(',', $val)]);
+                            $clause->whereIn($attr, explode(',', $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val == 'false' || $val == 'true') {
                             array_push($whereClause, [$attr, $val]);
                         } elseif ($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
