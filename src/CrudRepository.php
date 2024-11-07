@@ -30,8 +30,16 @@ abstract class CrudRepository
             unset($params['limit']);
         }
 
+        $attrs = ['*'];
+
+
         if (count($params) > 0) {
             $clause = (static::$model)::query();
+
+            if (isset($params['attrs'])) {
+                $attrs = is_string($params['attrs']) ? explode(',', $params['attrs']) : $params['attrs'];
+                unset($params['attrs']);
+            }
 
             // With
             $with = null;
@@ -97,7 +105,7 @@ abstract class CrudRepository
                         } elseif ($val === null || $val === 'null') {
                             array_push($whereClause, [$attr, null]); // $q->whereNull($attribute);
                         } elseif (str_contains($val, ',')) {
-                            $clause->whereIn($attr, explode(',', $val));
+                            array_push($whereClause, [$attr, explode(',', $val)]);
                         } elseif (is_numeric($val) || is_bool($val) || $val == 'false' || $val == 'true') {
                             array_push($whereClause, [$attr, $val]);
                         } elseif ($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
@@ -133,6 +141,8 @@ abstract class CrudRepository
             if ($orderBy) {
                 $clause->orderBy($orderBy, $orderByDirection ?? 'asc');
             }
+
+            $clause->select($attrs);
 
             if ($paginate) {
                 $data = $clause->paginate($perPage, ['*'], 'page', $page);
