@@ -139,7 +139,7 @@ abstract class CrudRepository
                 $clause->orderBy($orderBy, $orderByDirection ?? 'asc');
             }
 
-            if (!empty($select)) {
+            if (! empty($select)) {
                 $clause->select($select);
             }
 
