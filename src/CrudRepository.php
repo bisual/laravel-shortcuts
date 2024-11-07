@@ -32,7 +32,6 @@ abstract class CrudRepository
 
         $attrs = ['*'];
 
-
         if (count($params) > 0) {
             $clause = (static::$model)::query();
 
