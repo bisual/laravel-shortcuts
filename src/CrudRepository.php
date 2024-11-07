@@ -30,6 +30,8 @@ abstract class CrudRepository
             unset($params['limit']);
         }
 
+        $select = null;
+
         if (count($params) > 0) {
             $clause = (static::$model)::query();
 
@@ -139,7 +141,7 @@ abstract class CrudRepository
                 $clause->orderBy($orderBy, $orderByDirection ?? 'asc');
             }
 
-            if (! empty($select)) {
+            if ($select) {
                 $clause->select($select);
             }
 
