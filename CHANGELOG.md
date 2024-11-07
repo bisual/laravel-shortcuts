@@ -2,6 +2,18 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.2.10 - 2024-11-07
+
+### What's Changed
+
+* FEAT-attrs into main by @emondelodev in https://github.com/bisual/laravel-shortcuts/pull/7
+
+### New Contributors
+
+* @emondelodev made their first contribution in https://github.com/bisual/laravel-shortcuts/pull/7
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.2.9...v0.2.10
+
 ## v0.2.9 - 2024-11-05
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.2.8...v0.2.9
