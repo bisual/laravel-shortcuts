@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.2.11 - 2024-11-11
+
+### What's Changed
+
+* FEAT-storeRequestClass into main by @emondelodev in https://github.com/bisual/laravel-shortcuts/pull/8
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.2.10...v0.2.11
+
 ## v0.2.10 - 2024-11-07
 
 ### What's Changed
