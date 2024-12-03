@@ -5,6 +5,7 @@ namespace Bisual\LaravelShortcuts;
 class ControllerValidationHelper
 {
     private static $defaultValidationParameters = [
+        'search' => 'string',
         'with' => 'string',
         'without' => 'string',
         'append' => 'string',
