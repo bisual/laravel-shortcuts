@@ -42,7 +42,7 @@ abstract class CrudRepository
 
             $searchable_fields = (new static::$model)->searchable;
             $search = null;
-            if (isset($params['search']) && $searchable_fields != null && sizeof($searchable_fields) > 0) {
+            if (isset($params['search']) && $searchable_fields != null && count($searchable_fields) > 0) {
                 $search = $params['search'];
                 unset($params['search']);
             }
@@ -144,11 +144,14 @@ abstract class CrudRepository
             }
 
             // Process Searchable Fields
-            if($search) {
-                $clause->where(function($query) use(&$searchable_fields, &$search) {
-                    foreach($searchable_fields as $idx => $search_field) {
-                        if($idx == 0) $query->where($search_field, 'like', "%$search%");
-                        else $query->orWhere($search_field, 'like', "%$search%");
+            if ($search) {
+                $clause->where(function ($query) use (&$searchable_fields, &$search) {
+                    foreach ($searchable_fields as $idx => $search_field) {
+                        if ($idx == 0) {
+                            $query->where($search_field, 'like', "%$search%");
+                        } else {
+                            $query->orWhere($search_field, 'like', "%$search%");
+                        }
                     }
                 });
             }
