@@ -13,7 +13,7 @@ class ControllerValidationHelper
         'order_by_direction' => 'string|nullable',
         'per_page' => 'integer|nullable',
         'page' => 'integer|nullable',
-        'scopes' => 'string'
+        'scopes' => 'string',
     ];
 
     public static function indexQueryParametersValidation(array $params = [])

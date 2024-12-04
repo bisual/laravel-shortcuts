@@ -133,11 +133,11 @@ abstract class CrudRepository
             $clause = $clause->where($whereClause);
 
             // Process Scopes
-            if($scopes != null) {
-                $scopes = explode(",", $scopes);
-                foreach($scopes as $scope) {
-                    $scope_destruct = explode(":", $scope);
-                    if(sizeof($scope_destruct) > 0) {
+            if ($scopes != null) {
+                $scopes = explode(',', $scopes);
+                foreach ($scopes as $scope) {
+                    $scope_destruct = explode(':', $scope);
+                    if (count($scope_destruct) > 0) {
                         $scope_method = array_shift($scope_destruct);
                         $scope_params = $scope_destruct;
                         $clause->$scope_method(...$scope_params);
