@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.3.0 - 2024-12-04
+
+- New **scopes** in query parameters. Use it such as: `?name=Pol&scopes=scopeName1:param1:param2,scopeName2,scopeName3:param1` .
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.2.13...v0.3.0
+
 ## v0.2.13 - 2024-12-04
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.2.12...v0.2.13
