@@ -54,6 +54,13 @@ abstract class CrudRepository
                 unset($params['with']);
             }
 
+            // Scopes
+            $scopes = null;
+            if (array_key_exists('scopes', $params)) {
+                $scopes = $params['scopes'];
+                unset($params['scopes']);
+            }
+
             // Without
             $without = null;
             if (array_key_exists('without', $params)) {
@@ -124,6 +131,19 @@ abstract class CrudRepository
             }
 
             $clause = $clause->where($whereClause);
+
+            // Process Scopes
+            if($scopes != null) {
+                $scopes = explode(",", $scopes);
+                foreach($scopes as $scope) {
+                    $scope_destruct = explode(":", $scope);
+                    if(sizeof($scope_destruct) > 0) {
+                        $scope_method = array_shift($scope_destruct);
+                        $scope_params = $scope_destruct;
+                        $clause->$scope_method(...$scope_params);
+                    }
+                }
+            }
 
             /**
              * Process With

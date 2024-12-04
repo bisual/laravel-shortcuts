@@ -27,6 +27,8 @@ abstract class CrudController extends BaseController
         'destroy' => true,
     ];
 
+    public static array $indexQueryValidations = [];
+
     public static $storeRequestClass = Request::class; // pot ser un array de validacions també
 
     public static $updateRequestClass = Request::class; // pot ser un array de validacions també
@@ -36,7 +38,7 @@ abstract class CrudController extends BaseController
         if (static::$authorize['index']) {
             $this->authorize('viewAny', static::$model);
         }
-        $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation())->validate();
+        $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation(static::$indexQueryValidations))->validate();
 
         if ($functionExtraParametersTreatment != null) {
             $functionExtraParametersTreatment($params);
