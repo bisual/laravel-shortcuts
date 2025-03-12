@@ -85,10 +85,10 @@ abstract class CrudController extends BaseController
             $this->authorize('update', $item);
         }
 
-        if (static::$updateRequestClass !== 'Illuminate\Http\Request') {
-            $data = $request->validate((new static::$updateRequestClass)->rules());
-        } elseif (is_array(static::$updateRequestClass)) {
+        if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
+        } elseif (static::$updateRequestClass !== 'Illuminate\Http\Request') {
+            $data = $request->validate((new static::$updateRequestClass)->rules());
         } else {
             $data = $request->all();
         }
