@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v0.4.0 - 2025-03-13
+
+Support for laravel 12.
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.3.1...v0.4.0
+
 ## v0.3.1 - 2025-03-12
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.3.0...v0.3.1
