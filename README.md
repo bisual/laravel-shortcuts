@@ -84,7 +84,7 @@ And once again, you can choose what information about your relationship you rece
 ?select=relation..relation2..relation3.name|description
 ```
 
-#### Generalities
+#### ⚙️ Generalities
 
 In all cases, to separate different relationships, regardless of the depth level, they must be separated by a ','.
 
