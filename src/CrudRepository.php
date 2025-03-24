@@ -6,17 +6,11 @@ use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\App;
-use Illuminate\Database\Eloquent\Relations\{
-    Relation,
-    HasMany,
-    HasOne,
-    BelongsTo,
-    MorphTo,
-    MorphMany,
-    MorphOne,
-    MorphToMany,
-};
 
 abstract class CrudRepository
 {
@@ -277,10 +271,9 @@ abstract class CrudRepository
         return $clause;
     }
 
-
     private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null)
     {
-        $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive          
+        $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive
         self::processParamsStructure($clause, $struct);
     }
 
@@ -288,19 +281,16 @@ abstract class CrudRepository
      * Process the params structure
      *
      * @param [type] $clause
-     * @param array $struct
-     * @param Model|null $parent_model
-     * @param string|null $relation
-     * @return void
      */
-    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void {
+    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    {
         // SELECT
-        if (!empty($struct['select'])) {
+        if (! empty($struct['select'])) {
             $clause->select(self::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
         }
 
         // ORDER BY
-        if (!empty($struct['order_by'])) {
+        if (! empty($struct['order_by'])) {
             $order_field = array_key_first($struct['order_by']);
             $direction = $struct['order_by'][$order_field];
             $clause->orderBy($order_field, $direction);
@@ -310,7 +300,7 @@ abstract class CrudRepository
         if (empty($struct['with'])) {
             return;
         }
-        
+
         foreach ($struct['with'] as $relation => $config) {
             $clause->with($relation, function ($query) use ($relation, $config, $clause) {
                 $parent_model = $clause->getModel(); // get the parent model
@@ -321,24 +311,20 @@ abstract class CrudRepository
 
     /**
      * Create an array processing params
-     *
-     * @param string|null $string_with
-     * @param string|null $string_order_by
-     * @param string|null $string_select
-     * @return array
      */
-    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null): array {
+    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null): array
+    {
         $struct = [];
 
         if ($string_with) {
             // process $string_with --> skeleton of $struct
             foreach (explode(',', $string_with) as $with_segment) {
                 $current = &$struct;
-                foreach(explode('..', $with_segment) as $relation) {
-                    if (!isset($current['with'][$relation])) {
+                foreach (explode('..', $with_segment) as $relation) {
+                    if (! isset($current['with'][$relation])) {
                         $current['with'][$relation] = ['with' => []];
                     }
-    
+
                     $current = &$current['with'][$relation];
                 }
             }
@@ -348,12 +334,12 @@ abstract class CrudRepository
             // process $string_order_by
             foreach (explode(',', $string_order_by) as $order_by_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (!str_contains($order_by_segment, '.')) {
+                if (! str_contains($order_by_segment, '.')) {
                     $current = &$struct;
                     $parts = explode(':', $order_by_segment);
                     $order_by_direction = (count($parts) == 2) ? array_pop($parts) : 'asc';
                     $current['order_by'] = [
-                    $parts[0] => $order_by_direction
+                        $parts[0] => $order_by_direction,
                     ];
                 } else {
                     $current = &$struct['with'];
@@ -362,18 +348,18 @@ abstract class CrudRepository
                             $parts = explode(':', $relation_path);
                             $order_by_direction = (count($parts) == 2) ? array_pop($parts) : 'asc';
                             [$key, $order_by] = explode('.', $parts[0], 2);
-                            if (!array_key_exists($key, $current)) {
+                            if (! array_key_exists($key, $current)) {
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
-                            
+
                             $current[$key]['order_by'] = [
-                                $order_by => $order_by_direction
+                                $order_by => $order_by_direction,
                             ];
                         } else {
-                            if (!array_key_exists($relation_path, $current)) {
+                            if (! array_key_exists($relation_path, $current)) {
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
-                            
+
                             $current = &$current[$relation_path]['with'];
                         }
                     }
@@ -385,7 +371,7 @@ abstract class CrudRepository
             // process $string_select
             foreach (explode(',', $string_select) as $select_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (!str_contains($select_segment, '.')) {
+                if (! str_contains($select_segment, '.')) {
                     $current = &$struct;
                     $current['select'] = explode('|', $select_segment);
                 } else {
@@ -393,16 +379,16 @@ abstract class CrudRepository
                     foreach (explode('..', $select_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
                             [$key, $select] = explode('.', $relation_path, 2);
-                            if (!array_key_exists($key, $current)) {
+                            if (! array_key_exists($key, $current)) {
                                 throw new Exception("You can't select field that are not in the relation.");
                             }
-                            
+
                             $current[$key]['select'] = explode('|', $select);
                         } else {
-                            if (!array_key_exists($relation_path, $current)) {
+                            if (! array_key_exists($relation_path, $current)) {
                                 throw new Exception("You can't select field that are not in the relation.");
                             }
-                            
+
                             $current = &$current[$relation_path]['with'];
                         }
                     }
@@ -415,21 +401,17 @@ abstract class CrudRepository
 
     /**
      * Get the $model->$relation foreign key data
-     *
-     * @param Model $model
-     * @param string $relation
-     * @return array
      */
     private static function getForeignKeyData(Model $model, string $relation): array
     {
-        if (!method_exists($model, $relation)) {
-            throw new Exception("Relation '{$relation}' not found in model " . get_class($model));
+        if (! method_exists($model, $relation)) {
+            throw new Exception("Relation '{$relation}' not found in model ".get_class($model));
         }
 
         $relation_instance = $model->$relation();
 
-        if (!$relation_instance instanceof Relation) {
-            throw new Exception("Relation '{$relation}' not found in model " . get_class($model));
+        if (! $relation_instance instanceof Relation) {
+            throw new Exception("Relation '{$relation}' not found in model ".get_class($model));
         }
 
         if ($relation_instance instanceof MorphTo ||
@@ -451,11 +433,6 @@ abstract class CrudRepository
 
     /**
      * Build the select required fomat and fields
-     *
-     * @param array $select_fields
-     * @param Model|null $parent_model
-     * @param string|null $relation
-     * @return array
      */
     private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
     {
