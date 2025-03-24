@@ -45,7 +45,7 @@ php artisan vendor:publish --tag="laravel-shortcuts-views"
 
 You can build different formats of query params to handle sort, select and with in different depths of your query.
 
-#### With
+#### WITH
 
 To indicate depth within your query param 'with' you should use this format.
 
@@ -54,7 +54,7 @@ To indicate depth within your query param 'with' you should use this format.
 ```
 The '..' character indicates one level deeper.
 
-#### Order by
+#### ORDER BY
 
 You can simply indicate the field to order by entering it in your query as you have done all your life.
 
@@ -70,7 +70,7 @@ But you can also choose which fields of your relations to order and in which dep
 
 _If you do not indicate your 'order_by_direction' with ':' next to the field to sort by, it will sort in 'asc' direction by default_.
 
-#### Select
+#### SELECT
 
 You can indicate a single field of your main table to get only that information (you don't need to add the id).
 
@@ -94,7 +94,7 @@ In all cases, to separate different relationships, regardless of the depth level
 ?select=users.name,relation..relation2.title|description|created_at
 ```
 
-**NOTE**:The query param 'order_by_direction' is not necessary when using laravel-shortcuts since it is applied directly in 'order_by', using it could cause errors.
+**NOTE**: The query param 'order_by_direction' is not necessary when using laravel-shortcuts since it is applied directly in 'order_by', using it could cause errors.
 
 ## Changelog
 
