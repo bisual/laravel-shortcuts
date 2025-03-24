@@ -7,14 +7,6 @@
 
 This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
 
-## Support us
-
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/laravel-shortcuts.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/laravel-shortcuts)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
-
 ## Installation
 
 You can install the package via composer:
@@ -49,35 +41,64 @@ Optionally, you can publish the views using
 php artisan vendor:publish --tag="laravel-shortcuts-views"
 ```
 
-## Usage
+## Custom query params usage
 
-```php
-$laravelShortcuts = new Bisual\LaravelShortcuts();
-echo $laravelShortcuts->echoPhrase('Hello, Bisual!');
-```
+You can build different formats of query params to handle sort, select and with in different depths of your query.
 
-## Testing
+#### With
+
+To indicate depth within your query param 'with' you should use this format.
 
 ```bash
-composer test
+?with=relation..relation2..relation3
 ```
+The '..' character indicates one level deeper.
+
+#### Order by
+
+You can simply indicate the field to order by entering it in your query as you have done all your life.
+
+```bash
+?order_by=created_at
+```
+
+But you can also choose which fields of your relations to order and in which depth to do it, as well as indicate 'order_by_direction' in the same string.
+
+```bash
+?order_by=relation..relation2..relation3.created_at:desc
+```
+
+_If you do not indicate your 'order_by_direction' with ':' next to the field to sort by, it will sort in 'asc' direction by default_.
+
+#### Select
+
+You can indicate a single field of your main table to get only that information (you don't need to add the id).
+
+```bash
+?select=name
+```
+
+And once again, you can choose what information about your relationship you receive at the same time. Different fields of the same relationship level will be separated by '|'.
+
+```bash
+?select=relation..relation2..relation3.name|description
+```
+
+#### Generalities
+
+In all cases, to separate different relationships, regardless of the depth level, they must be separated by a ','.
+
+```bash
+?with=users,relation..relation2
+?order_by=users.name,relation..relation2.created_at:desc
+?select=users.name,relation..relation2.title|description|created_at
+```
+
+**NOTE**:The query param 'order_by_direction' is not necessary when using laravel-shortcuts since it is applied directly in 'order_by', using it could cause errors.
 
 ## Changelog
 
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
-
-## Credits
-
-- [Pol Ribas](https://github.com/polribas14)
-- [All Contributors](../../contributors)
 
 ## License
 
