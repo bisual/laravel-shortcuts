@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
 use Bisual\LaravelShortcuts\Traits\HasUuid;
@@ -12,23 +14,21 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\App;
 
-abstract class CrudRepository
-{
+abstract class CrudRepository {
     public static $model = Model::class;
 
-    /**+
+    /*+
      * @params
      *      - with
      *      - without
      *      - ... other attributes to filter
      */
-    public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
-    {
+    public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null) {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
         $page = $params['page'] ?? 1; // Obtener el número de página, predeterminado a 1
-        unset($params['page']);
-        unset($params['total']);
+        unset($params['page'], $params['total']);
+
         $limit = null;
         if (isset($params['limit'])) {
             $limit = $params['limit'];
@@ -39,9 +39,9 @@ abstract class CrudRepository
             // handling with, order_by and select
             $clause = self::getClause($params);
 
-            $searchable_fields = (new static::$model)->searchable;
+            $searchable_fields = (new static::$model())->searchable;
             $search = null;
-            if (isset($params['search']) && $searchable_fields != null && count($searchable_fields) > 0) {
+            if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
                 $search = $params['search'];
                 unset($params['search']);
             }
@@ -68,41 +68,43 @@ abstract class CrudRepository
             }
 
             // Extra parameters treatment
-            if ($functionExtraParametersTreatment != null) {
+            if ($functionExtraParametersTreatment !== null) {
                 $functionExtraParametersTreatment($clause, $params);
             }
 
             $whereClause = [];
             if (count($params) > 0) {
-                $model_inst = (new static::$model);
+                $model_inst = (new static::$model());
                 foreach ($params as $attr => $val) {
                     if ($val !== null && $val !== '') {
                         if (str_contains($attr, '-')) {
                             $separate = explode('-', $attr);
                             $relations = implode('-', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
-                            $table = (new static::$model)->$relations()->getRelated()->getTable();
-                            $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table, &$model_inst) {
+                            $table = (new static::$model())->{$relations}()->getRelated()->getTable();
+                            $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table, &$model_inst): void {
                                 if ($val === null || $val === 'null') {
                                     $q->whereNull($table.'.'.$attribute);
+                                } elseif($val === 'notnull') {
+                                    $q->whereNotNull($table.'.'.$attribute);
                                 } elseif (str_contains($val, ',')) {
                                     $q->whereIn($table.'.'.$attribute, explode(',', $val));
-                                } elseif (is_numeric($val) || is_bool($val) || $val == 'false' || $val == 'true') {
+                                } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                                     $q->where($table.'.'.$attribute, $val);
                                 } else {
-                                    $q->where($table.'.'.$attribute, 'like', "%$val%");
+                                    $q->where($table.'.'.$attribute, 'like', "%{$val}%");
                                 }
                             });
                         } elseif ($val === null || $val === 'null') {
-                            array_push($whereClause, [$attr, null]); // $q->whereNull($attribute);
-                        } elseif (str_contains($val, ',')) {
+                            $whereClause[] = [$attr, null]; // $q->whereNull($attribute);
+                        } elseif (str_contains((string) $val, ',')) {
                             $clause->whereIn($attr, explode(',', $val));
-                        } elseif (is_numeric($val) || is_bool($val) || $val == 'false' || $val == 'true') {
-                            array_push($whereClause, [$attr, $val]);
+                        } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
+                            $whereClause[] = [$attr, $val];
                         } elseif ($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
                             $clause->whereDate($attr, Carbon::parse($val));
                         } else {
-                            array_push($whereClause, [$attr, 'like', "%$val%"]);
+                            $whereClause[] = [$attr, 'like', "%{$val}%"];
                         }
                     }
                 }
@@ -111,14 +113,14 @@ abstract class CrudRepository
             $clause = $clause->where($whereClause);
 
             // Process Scopes
-            if ($scopes != null) {
+            if ($scopes !== null) {
                 $scopes = explode(',', $scopes);
                 foreach ($scopes as $scope) {
                     $scope_destruct = explode(':', $scope);
                     if (count($scope_destruct) > 0) {
                         $scope_method = array_shift($scope_destruct);
                         $scope_params = $scope_destruct;
-                        $clause->$scope_method(...$scope_params);
+                        $clause->{$scope_method}(...$scope_params);
                     }
                 }
             }
@@ -132,12 +134,19 @@ abstract class CrudRepository
 
             // Process Searchable Fields
             if ($search) {
-                $clause->where(function ($query) use (&$searchable_fields, &$search) {
+                $clause->where(function ($query) use (&$searchable_fields, &$search): void {
                     foreach ($searchable_fields as $idx => $search_field) {
-                        if ($idx == 0) {
-                            $query->where($search_field, 'like', "%$search%");
+                        $parts = explode('.', $search_field);
+                        if(count($parts) === 2) {
+                            if($idx === 0) {
+                                $query->whereHas($parts[0], function ($query) use (&$parts, &$search): void { $query->where($parts[1], 'like', "%{$search}%"); });
+                            } else {
+                                $query->orWhereHas($parts[0], function ($query) use (&$parts, &$search): void { $query->where($parts[1], 'like', "%{$search}%"); });
+                            }
+                        } elseif ($idx === 0) {
+                            $query->where($search_field, 'like', "%{$search}%");
                         } else {
-                            $query->orWhere($search_field, 'like', "%$search%");
+                            $query->orWhere($search_field, 'like', "%{$search}%");
                         }
                     }
                 });
@@ -152,7 +161,7 @@ abstract class CrudRepository
                 $data = $clause->get();
             }
 
-            if ($append != null) {
+            if ($append !== null) {
                 foreach ($data as $model) {
                     foreach (explode(',', $append) as $append_item) {
                         $model->append($append_item);
@@ -161,24 +170,23 @@ abstract class CrudRepository
             }
 
             return $data;
-        } elseif ($functionExtraParametersTreatment != null) {
+        } elseif ($functionExtraParametersTreatment !== null) {
             $clause = (static::$model)::query();
-            if ($functionExtraParametersTreatment != null) {
+            if ($functionExtraParametersTreatment !== null) {
                 $functionExtraParametersTreatment($clause, $params);
             }
 
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
-        } else {
-            return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
         }
+
+        return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
     }
 
-    public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
-    {
+    public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false) {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
 
-        if ($functionExtraParametersTreatment != null) {
+        if ($functionExtraParametersTreatment !== null) {
             $functionExtraParametersTreatment($clause, $params);
         }
 
@@ -192,7 +200,7 @@ abstract class CrudRepository
             $id = $id['id'];
         } // per si li hem passat en array
 
-        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
+        if (!is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
             $clause->byUUID($id);
         } else {
             $clause->where(App::make(static::$model)->getKeyName(), $id);
@@ -200,7 +208,7 @@ abstract class CrudRepository
 
         $model = $clause->firstOrFail();
 
-        if (isset($params['append']) && $params['append'] != '') {
+        if (isset($params['append']) && $params['append'] !== '') {
             foreach (explode(',', $params['append']) as $append) {
                 $model->append($append);
             }
@@ -209,13 +217,11 @@ abstract class CrudRepository
         return $model;
     }
 
-    public static function store(array $data)
-    {
+    public static function store(array $data) {
         return (static::$model)::create($data);
     }
 
-    public static function update($model, $params)
-    {
+    public static function update($model, $params) {
         $model = self::show($model);
 
         $model->update($params);
@@ -223,11 +229,10 @@ abstract class CrudRepository
         return $model->fresh();
     }
 
-    public static function destroy($model, $functionExtraParametersTreatment = null)
-    {
+    public static function destroy($model, $functionExtraParametersTreatment = null) {
         $model = self::show($model);
 
-        if ($functionExtraParametersTreatment != null) {
+        if ($functionExtraParametersTreatment !== null) {
             $functionExtraParametersTreatment($model->id);
         }
 
@@ -237,10 +242,9 @@ abstract class CrudRepository
     }
 
     /**
-     * Other private functions
+     * Other private functions.
      */
-    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
-    {
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false) {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
 
         // With
@@ -271,26 +275,24 @@ abstract class CrudRepository
         return $clause;
     }
 
-    private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null)
-    {
+    private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null): void {
         $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive
         self::processParamsStructure($clause, $struct);
     }
 
     /**
-     * Process the params structure
+     * Process the params structure.
      *
      * @param [type] $clause
      */
-    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
-    {
+    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void {
         // SELECT
-        if (! empty($struct['select'])) {
+        if (!empty($struct['select'])) {
             $clause->select(self::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
         }
 
         // ORDER BY
-        if (! empty($struct['order_by'])) {
+        if (!empty($struct['order_by'])) {
             $order_field = array_key_first($struct['order_by']);
             $direction = $struct['order_by'][$order_field];
             $clause->orderBy($order_field, $direction);
@@ -302,7 +304,7 @@ abstract class CrudRepository
         }
 
         foreach ($struct['with'] as $relation => $config) {
-            $clause->with($relation, function ($query) use ($relation, $config, $clause) {
+            $clause->with($relation, function ($query) use ($relation, $config, $clause): void {
                 $parent_model = $clause->getModel(); // get the parent model
                 self::processParamsStructure($query, $config, $parent_model, $relation);
             });
@@ -310,10 +312,9 @@ abstract class CrudRepository
     }
 
     /**
-     * Create an array processing params
+     * Create an array processing params.
      */
-    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null): array
-    {
+    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null): array {
         $struct = [];
 
         if ($string_with) {
@@ -321,7 +322,7 @@ abstract class CrudRepository
             foreach (explode(',', $string_with) as $with_segment) {
                 $current = &$struct;
                 foreach (explode('..', $with_segment) as $relation) {
-                    if (! isset($current['with'][$relation])) {
+                    if (!isset($current['with'][$relation])) {
                         $current['with'][$relation] = ['with' => []];
                     }
 
@@ -334,10 +335,10 @@ abstract class CrudRepository
             // process $string_order_by
             foreach (explode(',', $string_order_by) as $order_by_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (! str_contains($order_by_segment, '.')) {
+                if (!str_contains($order_by_segment, '.')) {
                     $current = &$struct;
                     $parts = explode(':', $order_by_segment);
-                    $order_by_direction = (count($parts) == 2) ? array_pop($parts) : 'asc';
+                    $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
                     $current['order_by'] = [
                         $parts[0] => $order_by_direction,
                     ];
@@ -346,9 +347,9 @@ abstract class CrudRepository
                     foreach (explode('..', $order_by_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
                             $parts = explode(':', $relation_path);
-                            $order_by_direction = (count($parts) == 2) ? array_pop($parts) : 'asc';
+                            $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
                             [$key, $order_by] = explode('.', $parts[0], 2);
-                            if (! array_key_exists($key, $current)) {
+                            if (!array_key_exists($key, $current)) {
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
 
@@ -356,7 +357,7 @@ abstract class CrudRepository
                                 $order_by => $order_by_direction,
                             ];
                         } else {
-                            if (! array_key_exists($relation_path, $current)) {
+                            if (!array_key_exists($relation_path, $current)) {
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
 
@@ -371,7 +372,7 @@ abstract class CrudRepository
             // process $string_select
             foreach (explode(',', $string_select) as $select_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (! str_contains($select_segment, '.')) {
+                if (!str_contains($select_segment, '.')) {
                     $current = &$struct;
                     $current['select'] = explode('|', $select_segment);
                 } else {
@@ -379,13 +380,13 @@ abstract class CrudRepository
                     foreach (explode('..', $select_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
                             [$key, $select] = explode('.', $relation_path, 2);
-                            if (! array_key_exists($key, $current)) {
+                            if (!array_key_exists($key, $current)) {
                                 throw new Exception("You can't select field that are not in the relation.");
                             }
 
                             $current[$key]['select'] = explode('|', $select);
                         } else {
-                            if (! array_key_exists($relation_path, $current)) {
+                            if (!array_key_exists($relation_path, $current)) {
                                 throw new Exception("You can't select field that are not in the relation.");
                             }
 
@@ -400,23 +401,22 @@ abstract class CrudRepository
     }
 
     /**
-     * Get the $model->$relation foreign key data
+     * Get the $model->$relation foreign key data.
      */
-    private static function getForeignKeyData(Model $model, string $relation): array
-    {
-        if (! method_exists($model, $relation)) {
-            throw new Exception("Relation '{$relation}' not found in model ".get_class($model));
+    private static function getForeignKeyData(Model $model, string $relation): array {
+        if (!method_exists($model, $relation)) {
+            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
         }
 
-        $relation_instance = $model->$relation();
+        $relation_instance = $model->{$relation}();
 
-        if (! $relation_instance instanceof Relation) {
-            throw new Exception("Relation '{$relation}' not found in model ".get_class($model));
+        if (!$relation_instance instanceof Relation) {
+            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
         }
 
-        if ($relation_instance instanceof MorphTo ||
-            $relation_instance instanceof MorphOne ||
-            $relation_instance instanceof MorphMany
+        if ($relation_instance instanceof MorphTo
+            || $relation_instance instanceof MorphOne
+            || $relation_instance instanceof MorphMany
         ) {
             return [
                 $relation_instance->getForeignKeyName(),
@@ -432,10 +432,9 @@ abstract class CrudRepository
     }
 
     /**
-     * Build the select required fomat and fields
+     * Build the select required fomat and fields.
      */
-    private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
-    {
+    private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array {
         return array_unique(array_merge( // array_unique if we get the id from the front
             ['id'],
             $select_fields,
