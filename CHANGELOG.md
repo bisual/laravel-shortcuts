@@ -2,6 +2,18 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.0.0 - 2025-03-25
+
+### What's Changed
+
+* FEAT-querParserRefactor into main by @franaral27 in https://github.com/bisual/laravel-shortcuts/pull/9
+
+### New Contributors
+
+* @franaral27 made their first contribution in https://github.com/bisual/laravel-shortcuts/pull/9
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v0.4.0...v1.0.0
+
 ## v0.4.0 - 2025-03-13
 
 Support for laravel 12.
