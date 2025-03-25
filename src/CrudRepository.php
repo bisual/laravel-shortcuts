@@ -85,7 +85,7 @@ abstract class CrudRepository {
                             $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table, &$model_inst): void {
                                 if ($val === null || $val === 'null') {
                                     $q->whereNull($table.'.'.$attribute);
-                                } elseif($val === 'notnull') {
+                                } elseif ($val === 'notnull') {
                                     $q->whereNotNull($table.'.'.$attribute);
                                 } elseif (str_contains($val, ',')) {
                                     $q->whereIn($table.'.'.$attribute, explode(',', $val));
@@ -97,6 +97,8 @@ abstract class CrudRepository {
                             });
                         } elseif ($val === null || $val === 'null') {
                             $whereClause[] = [$attr, null]; // $q->whereNull($attribute);
+                        } elseif ($val === 'notnull') {
+                            $clause->whereNotNull($attr);
                         } elseif (str_contains((string) $val, ',')) {
                             $clause->whereIn($attr, explode(',', $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
@@ -137,11 +139,15 @@ abstract class CrudRepository {
                 $clause->where(function ($query) use (&$searchable_fields, &$search): void {
                     foreach ($searchable_fields as $idx => $search_field) {
                         $parts = explode('.', $search_field);
-                        if(count($parts) === 2) {
-                            if($idx === 0) {
-                                $query->whereHas($parts[0], function ($query) use (&$parts, &$search): void { $query->where($parts[1], 'like', "%{$search}%"); });
+                        if (count($parts) === 2) {
+                            if ($idx === 0) {
+                                $query->whereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                    $query->where($parts[1], 'like', "%{$search}%");
+                                });
                             } else {
-                                $query->orWhereHas($parts[0], function ($query) use (&$parts, &$search): void { $query->where($parts[1], 'like', "%{$search}%"); });
+                                $query->orWhereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                    $query->where($parts[1], 'like', "%{$search}%");
+                                });
                             }
                         } elseif ($idx === 0) {
                             $query->where($search_field, 'like', "%{$search}%");
