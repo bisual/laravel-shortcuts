@@ -4,7 +4,12 @@ namespace Bisual\LaravelShortcuts;
 
 use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\App;
 
 abstract class CrudRepository
@@ -30,28 +35,15 @@ abstract class CrudRepository
             unset($params['limit']);
         }
 
-        $select = null;
-
         if (count($params) > 0) {
-            $clause = (static::$model)::query();
-
-            if (isset($params['select'])) {
-                $select = is_string($params['select']) ? explode(',', $params['select']) : $params['select'];
-                unset($params['select']);
-            }
+            // handling with, order_by and select
+            $clause = self::getClause($params);
 
             $searchable_fields = (new static::$model)->searchable;
             $search = null;
             if (isset($params['search']) && $searchable_fields != null && count($searchable_fields) > 0) {
                 $search = $params['search'];
                 unset($params['search']);
-            }
-
-            // With
-            $with = null;
-            if (array_key_exists('with', $params)) {
-                $with = $params['with'];
-                unset($params['with']);
             }
 
             // Scopes
@@ -66,20 +58,6 @@ abstract class CrudRepository
             if (array_key_exists('without', $params)) {
                 $without = $params['without'];
                 unset($params['without']);
-            }
-
-            // Order by
-            $orderBy = null;
-            if (array_key_exists('order_by', $params)) {
-                $orderBy = $params['order_by'];
-                unset($params['order_by']);
-            }
-
-            // Order by direction
-            $orderByDirection = null;
-            if (array_key_exists('order_by_direction', $params)) {
-                $orderByDirection = $params['order_by_direction'];
-                unset($params['order_by_direction']);
             }
 
             // Append
@@ -145,17 +123,6 @@ abstract class CrudRepository
                 }
             }
 
-            /**
-             * Process With
-             *  - array $with
-             *      - relation.attribute
-             *      - relation..relation2
-             *      - relation..relation2.atribute
-             */
-            if ($with) {
-                self::handleWith($clause, $with);
-            }
-
             // Process Without
             if ($without) {
                 foreach (explode(',', $without) as $w) {
@@ -174,15 +141,6 @@ abstract class CrudRepository
                         }
                     }
                 });
-            }
-
-            // Process Order by
-            if ($orderBy) {
-                $clause->orderBy($orderBy, $orderByDirection ?? 'asc');
-            }
-
-            if ($select) {
-                $clause->select($select);
             }
 
             if ($paginate) {
@@ -217,7 +175,9 @@ abstract class CrudRepository
 
     public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
     {
+        // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
+
         if ($functionExtraParametersTreatment != null) {
             $functionExtraParametersTreatment($clause, $params);
         }
@@ -236,10 +196,6 @@ abstract class CrudRepository
             $clause->byUUID($id);
         } else {
             $clause->where(App::make(static::$model)->getKeyName(), $id);
-        }
-
-        if (isset($params['with']) && $params['with'] != '') {
-            self::handleWith($clause, $params['with']);
         }
 
         $model = $clause->firstOrFail();
@@ -283,38 +239,207 @@ abstract class CrudRepository
     /**
      * Other private functions
      */
-    protected static function getClause(array $params = [], bool $withoutGlobalScopes = false)
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
     {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
+
+        // With
+        $with = null;
         if (isset($params['with'])) {
             $with = $params['with'];
             unset($params['with']);
-            self::handleWith($clause, $with);
+        }
+
+        // Order by
+        $order_by = null;
+        if (isset($params['order_by'])) {
+            $order_by = $params['order_by'];
+            unset($params['order_by']);
+        }
+
+        // Select
+        $select = null;
+        if (isset($params['select'])) {
+            $select = $params['select'];
+            unset($params['select']);
+        }
+
+        if ($with || $order_by || $select) {
+            self::handleWithOrderByAndSelect($clause, $with, $order_by, $select);
         }
 
         return $clause;
     }
 
-    /**
-     * Process With
-     *  - array $with
-     *      - relation.attribute
-     *      - relation..relation2
-     *      - relation..relation2.atribute
-     */
-    private static function handleWith(&$clause, string $with)
+    private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null)
     {
-        foreach (explode(',', $with) as $w) {
-            $arr_w = explode('.', $w);
-            if (! str_contains($w, '..') && count($arr_w) == 2) {
-                $clause->with([$arr_w[0] => function ($q) use ($arr_w) {
-                    // Esta la ID por esto: https://stackoverflow.com/questions/19852927/get-specific-columns-using-with-function-in-laravel-eloquent
-                    $q->select('id', $arr_w[1]); // p.e. select 'user'.'user_uuid'
-                }]);
-            } else {
-                $w_cleaned = str_replace('..', '.', $w);
-                $clause->with($w_cleaned);
+        $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive
+        self::processParamsStructure($clause, $struct);
+    }
+
+    /**
+     * Process the params structure
+     *
+     * @param [type] $clause
+     */
+    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    {
+        // SELECT
+        if (! empty($struct['select'])) {
+            $clause->select(self::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
+        }
+
+        // ORDER BY
+        if (! empty($struct['order_by'])) {
+            $order_field = array_key_first($struct['order_by']);
+            $direction = $struct['order_by'][$order_field];
+            $clause->orderBy($order_field, $direction);
+        }
+
+        // recursuvity stop condition
+        if (empty($struct['with'])) {
+            return;
+        }
+
+        foreach ($struct['with'] as $relation => $config) {
+            $clause->with($relation, function ($query) use ($relation, $config, $clause) {
+                $parent_model = $clause->getModel(); // get the parent model
+                self::processParamsStructure($query, $config, $parent_model, $relation);
+            });
+        }
+    }
+
+    /**
+     * Create an array processing params
+     */
+    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null): array
+    {
+        $struct = [];
+
+        if ($string_with) {
+            // process $string_with --> skeleton of $struct
+            foreach (explode(',', $string_with) as $with_segment) {
+                $current = &$struct;
+                foreach (explode('..', $with_segment) as $relation) {
+                    if (! isset($current['with'][$relation])) {
+                        $current['with'][$relation] = ['with' => []];
+                    }
+
+                    $current = &$current['with'][$relation];
+                }
             }
         }
+
+        if ($string_order_by) {
+            // process $string_order_by
+            foreach (explode(',', $string_order_by) as $order_by_segment) {
+                // if it doesn't have '..', we are on the main table
+                if (! str_contains($order_by_segment, '.')) {
+                    $current = &$struct;
+                    $parts = explode(':', $order_by_segment);
+                    $order_by_direction = (count($parts) == 2) ? array_pop($parts) : 'asc';
+                    $current['order_by'] = [
+                        $parts[0] => $order_by_direction,
+                    ];
+                } else {
+                    $current = &$struct['with'];
+                    foreach (explode('..', $order_by_segment) as $relation_path) {
+                        if (str_contains($relation_path, '.')) {
+                            $parts = explode(':', $relation_path);
+                            $order_by_direction = (count($parts) == 2) ? array_pop($parts) : 'asc';
+                            [$key, $order_by] = explode('.', $parts[0], 2);
+                            if (! array_key_exists($key, $current)) {
+                                throw new Exception("You can't order by field that are not in the relation.");
+                            }
+
+                            $current[$key]['order_by'] = [
+                                $order_by => $order_by_direction,
+                            ];
+                        } else {
+                            if (! array_key_exists($relation_path, $current)) {
+                                throw new Exception("You can't order by field that are not in the relation.");
+                            }
+
+                            $current = &$current[$relation_path]['with'];
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($string_select) {
+            // process $string_select
+            foreach (explode(',', $string_select) as $select_segment) {
+                // if it doesn't have '..', we are on the main table
+                if (! str_contains($select_segment, '.')) {
+                    $current = &$struct;
+                    $current['select'] = explode('|', $select_segment);
+                } else {
+                    $current = &$struct['with'];
+                    foreach (explode('..', $select_segment) as $relation_path) {
+                        if (str_contains($relation_path, '.')) {
+                            [$key, $select] = explode('.', $relation_path, 2);
+                            if (! array_key_exists($key, $current)) {
+                                throw new Exception("You can't select field that are not in the relation.");
+                            }
+
+                            $current[$key]['select'] = explode('|', $select);
+                        } else {
+                            if (! array_key_exists($relation_path, $current)) {
+                                throw new Exception("You can't select field that are not in the relation.");
+                            }
+
+                            $current = &$current[$relation_path]['with'];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $struct;
+    }
+
+    /**
+     * Get the $model->$relation foreign key data
+     */
+    private static function getForeignKeyData(Model $model, string $relation): array
+    {
+        if (! method_exists($model, $relation)) {
+            throw new Exception("Relation '{$relation}' not found in model ".get_class($model));
+        }
+
+        $relation_instance = $model->$relation();
+
+        if (! $relation_instance instanceof Relation) {
+            throw new Exception("Relation '{$relation}' not found in model ".get_class($model));
+        }
+
+        if ($relation_instance instanceof MorphTo ||
+            $relation_instance instanceof MorphOne ||
+            $relation_instance instanceof MorphMany
+        ) {
+            return [
+                $relation_instance->getForeignKeyName(),
+                $relation_instance->getMorphType(),
+            ];
+        }
+
+        if (method_exists($relation_instance, 'getForeignKeyName')) {
+            return [$relation_instance->getForeignKeyName()];
+        }
+
+        return [];
+    }
+
+    /**
+     * Build the select required fomat and fields
+     */
+    private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
+    {
+        return array_unique(array_merge( // array_unique if we get the id from the front
+            ['id'],
+            $select_fields,
+            $parent_model && $relation ? self::getForeignKeyData($parent_model, $relation) : []
+        ));
     }
 }
