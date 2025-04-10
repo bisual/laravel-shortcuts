@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
 use Illuminate\Database\Eloquent\Model;
@@ -11,8 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Validator;
 
-abstract class CrudController extends BaseController
-{
+abstract class CrudController extends BaseController {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
     public static $repository = CrudRepository::class;
@@ -33,22 +34,20 @@ abstract class CrudController extends BaseController
 
     public static $updateRequestClass = Request::class; // pot ser un array de validacions també
 
-    public function index(Request $request, $functionExtraParametersTreatment = null)
-    {
+    public function index(Request $request, $functionExtraParametersTreatment = null) {
         if (static::$authorize['index']) {
             $this->authorize('viewAny', static::$model);
         }
         $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation(static::$indexQueryValidations))->validate();
 
-        if ($functionExtraParametersTreatment != null) {
+        if ($functionExtraParametersTreatment !== null) {
             $functionExtraParametersTreatment($params);
         }
 
         return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
     }
 
-    public function show(Request $request, $id)
-    {
+    public function show(Request $request, $id) {
         $item = static::$repository::show($id, $request->query());
         if (static::$authorize['show']) {
             $this->authorize('view', $item);
@@ -57,57 +56,55 @@ abstract class CrudController extends BaseController
         return response()->json($item);
     }
 
-    public function store(Request $request, $functionExtraParametersTreatment = null)
-    {
-        if (static::$authorize['store']) {
-            $this->authorize('create', static::$model);
-        }
-
+    public function store(Request $request, $functionExtraParametersTreatment = null) {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
         } elseif (static::$storeRequestClass !== 'Illuminate\Http\Request') {
-            $data = $request->validate((new static::$storeRequestClass)->rules());
+            $data = $request->validate((new static::$storeRequestClass())->rules());
         } else {
             $data = $request->all();
         }
 
-        if ($functionExtraParametersTreatment != null) {
+        if (static::$authorize['store']) {
+            $this->authorize('create', [static::$model, $data]);
+        }
+
+        if ($functionExtraParametersTreatment !== null) {
             $functionExtraParametersTreatment($data);
         }
 
         return response()->json((static::$repository)::store($data));
     }
 
-    public function update(Request $request, $id, $functionExtraParametersTreatment = null)
-    {
+    public function update(Request $request, $id, $functionExtraParametersTreatment = null) {
         $item = (static::$repository)::show($id);
-        if (static::$authorize['update']) {
-            $this->authorize('update', $item);
-        }
 
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
         } elseif (static::$updateRequestClass !== 'Illuminate\Http\Request') {
-            $data = $request->validate((new static::$updateRequestClass)->rules());
+            $data = $request->validate((new static::$updateRequestClass())->rules());
         } else {
             $data = $request->all();
         }
 
-        if ($functionExtraParametersTreatment != null) {
+        if (static::$authorize['update']) {
+            $this->authorize('update', [$item, $data]);
+        }
+
+        if ($functionExtraParametersTreatment !== null) {
             $functionExtraParametersTreatment($item, $data);
         }
 
         return response()->json((static::$repository)::update($item, $data));
     }
 
-    public function destroy(Request $request, $id, $functionExtraParametersTreatment = null)
-    {
+    public function destroy(Request $request, $id, $functionExtraParametersTreatment = null) {
         $item = (static::$repository)::show($id);
         if (static::$authorize['destroy']) {
             $this->authorize('delete', $item);
         }
 
-        if ($functionExtraParametersTreatment != null) {
+        if ($functionExtraParametersTreatment !== null) {
             $functionExtraParametersTreatment($item);
         }
 
