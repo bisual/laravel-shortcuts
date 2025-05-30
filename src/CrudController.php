@@ -121,8 +121,8 @@ abstract class CrudController extends BaseController
 
     private function handleFormRequestValidation(Request $request, string $requestClass): array
     {
-        if (!is_subclass_of($requestClass, FormRequest::class)) {
-            throw new InvalidArgumentException("Class {$requestClass} must be an instance of " . FormRequest::class);
+        if (! is_subclass_of($requestClass, FormRequest::class)) {
+            throw new InvalidArgumentException("Class {$requestClass} must be an instance of ".FormRequest::class);
         }
 
         /** @var FormRequest $formRequest */
@@ -133,6 +133,7 @@ abstract class CrudController extends BaseController
         $formRequest->setRouteResolver($request->getRouteResolver());
 
         $formRequest->validateResolved();
+
         return $formRequest->validated();
     }
 }
