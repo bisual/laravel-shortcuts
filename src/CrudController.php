@@ -7,11 +7,13 @@ namespace Bisual\LaravelShortcuts;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Validator;
+use InvalidArgumentException;
 
 abstract class CrudController extends BaseController
 {
@@ -63,8 +65,8 @@ abstract class CrudController extends BaseController
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
-        } elseif (static::$storeRequestClass !== 'Illuminate\Http\Request') {
-            $data = $request->validate((new static::$storeRequestClass)->rules());
+        } elseif (static::$storeRequestClass !== Request::class) {
+            $data = $this->handleFormRequestValidation($request, static::$storeRequestClass);
         } else {
             $data = $request->all();
         }
@@ -86,8 +88,8 @@ abstract class CrudController extends BaseController
 
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
-        } elseif (static::$updateRequestClass !== 'Illuminate\Http\Request') {
-            $data = $request->validate((new static::$updateRequestClass)->rules());
+        } elseif (static::$updateRequestClass !== Request::class) {
+            $data = $this->handleFormRequestValidation($request, static::$updateRequestClass);
         } else {
             $data = $request->all();
         }
@@ -115,5 +117,22 @@ abstract class CrudController extends BaseController
         }
 
         return response()->json((static::$repository)::destroy($item));
+    }
+
+    private function handleFormRequestValidation(Request $request, string $requestClass): array
+    {
+        if (!is_subclass_of($requestClass, FormRequest::class)) {
+            throw new InvalidArgumentException("Class {$requestClass} must be an instance of " . FormRequest::class);
+        }
+
+        /** @var FormRequest $formRequest */
+        $formRequest = app($requestClass);
+        $formRequest->merge($request->all());
+
+        $formRequest->setUserResolver($request->getUserResolver());
+        $formRequest->setRouteResolver($request->getRouteResolver());
+
+        $formRequest->validateResolved();
+        return $formRequest->validated();
     }
 }
