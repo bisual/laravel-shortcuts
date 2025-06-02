@@ -2,6 +2,18 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.1.0 - 2025-06-02
+
+### What's Changed
+
+* fix: properly handle FormRequest lifecycle in CRUD controller by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/10
+
+### New Contributors
+
+* @ericmp33 made their first contribution in https://github.com/bisual/laravel-shortcuts/pull/10
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.0.3...v1.1.0
+
 ## v1.0.3 - 2025-04-10
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.0.2...v1.0.3
