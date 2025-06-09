@@ -38,7 +38,7 @@ abstract class CrudController extends BaseController {
 
     public function index(Request $request, $functionExtraParametersTreatment = null) {
         if (static::$authorize['index']) {
-            $this->authorize('viewAny', static::$model, $request->query());
+            $this->authorize('viewAny', [static::$model, $request->query()]);
         }
 
         if(count(static::$indexQueryValidations) > 0) {
