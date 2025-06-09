@@ -15,7 +15,8 @@ use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
 
-abstract class CrudController extends BaseController {
+abstract class CrudController extends BaseController
+{
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
     public static $repository = CrudRepository::class;
@@ -36,12 +37,13 @@ abstract class CrudController extends BaseController {
 
     public static $updateRequestClass = Request::class; // pot ser un array de validacions també
 
-    public function index(Request $request, $functionExtraParametersTreatment = null) {
+    public function index(Request $request, $functionExtraParametersTreatment = null)
+    {
         if (static::$authorize['index']) {
             $this->authorize('viewAny', [static::$model, $request->query()]);
         }
 
-        if(count(static::$indexQueryValidations) > 0) {
+        if (count(static::$indexQueryValidations) > 0) {
             $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation(static::$indexQueryValidations))->validate();
         } else {
             $params = $request->query();
@@ -54,7 +56,8 @@ abstract class CrudController extends BaseController {
         return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
     }
 
-    public function show(Request $request, $id) {
+    public function show(Request $request, $id)
+    {
         $item = static::$repository::show($id, $request->query());
         if (static::$authorize['show']) {
             $this->authorize('view', $item);
@@ -63,7 +66,8 @@ abstract class CrudController extends BaseController {
         return response()->json($item);
     }
 
-    public function store(Request $request, $functionExtraParametersTreatment = null) {
+    public function store(Request $request, $functionExtraParametersTreatment = null)
+    {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
         } elseif (static::$storeRequestClass !== Request::class) {
@@ -83,7 +87,8 @@ abstract class CrudController extends BaseController {
         return response()->json((static::$repository)::store($data));
     }
 
-    public function update(Request $request, $id, $functionExtraParametersTreatment = null) {
+    public function update(Request $request, $id, $functionExtraParametersTreatment = null)
+    {
         $item = (static::$repository)::show($id);
 
         if (is_array(static::$updateRequestClass)) {
@@ -105,7 +110,8 @@ abstract class CrudController extends BaseController {
         return response()->json((static::$repository)::update($item, $data));
     }
 
-    public function destroy(Request $request, $id, $functionExtraParametersTreatment = null) {
+    public function destroy(Request $request, $id, $functionExtraParametersTreatment = null)
+    {
         $item = (static::$repository)::show($id);
         if (static::$authorize['destroy']) {
             $this->authorize('delete', $item);
@@ -118,8 +124,9 @@ abstract class CrudController extends BaseController {
         return response()->json((static::$repository)::destroy($item));
     }
 
-    private function handleFormRequestValidation(Request $request, string $requestClass): array {
-        if (!is_subclass_of($requestClass, FormRequest::class)) {
+    private function handleFormRequestValidation(Request $request, string $requestClass): array
+    {
+        if (! is_subclass_of($requestClass, FormRequest::class)) {
             throw new InvalidArgumentException("Class {$requestClass} must be an instance of ".FormRequest::class);
         }
 
