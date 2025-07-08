@@ -9,13 +9,11 @@ use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\App;
 
-abstract class CrudRepository {
+abstract class CrudRepository
+{
     public static $model = Model::class;
 
     /*+
@@ -24,7 +22,8 @@ abstract class CrudRepository {
      *      - without
      *      - ... other attributes to filter
      */
-    public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null) {
+    public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
+    {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
         $page = $params['page'] ?? 1; // Obtener el número de página, predeterminado a 1
@@ -40,7 +39,7 @@ abstract class CrudRepository {
             // query params on deepest with
             $clause = self::getClause($params);
 
-            $searchable_fields = (new static::$model())->searchable;
+            $searchable_fields = (new static::$model)->searchable;
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
                 $search = $params['search'];
@@ -175,13 +174,15 @@ abstract class CrudRepository {
             if ($functionExtraParametersTreatment !== null) {
                 $functionExtraParametersTreatment($clause, $params);
             }
+
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
 
         return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
     }
 
-    public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false) {
+    public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
+    {
         // query params on deepest with
         $clause = self::getClause($params, $withoutGlobalScopes);
 
@@ -199,7 +200,7 @@ abstract class CrudRepository {
             $id = $id['id'];
         } // per si li hem passat en array
 
-        if (!is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
+        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
             $clause->byUUID($id);
         } else {
             $clause->where(App::make(static::$model)->getKeyName(), $id);
@@ -216,11 +217,13 @@ abstract class CrudRepository {
         return $model;
     }
 
-    public static function store(array $data) {
+    public static function store(array $data)
+    {
         return (static::$model)::create($data);
     }
 
-    public static function update($model, $params) {
+    public static function update($model, $params)
+    {
         $model = self::show($model);
 
         $model->update($params);
@@ -228,7 +231,8 @@ abstract class CrudRepository {
         return $model->fresh();
     }
 
-    public static function destroy($model, $functionExtraParametersTreatment = null) {
+    public static function destroy($model, $functionExtraParametersTreatment = null)
+    {
         $model = self::show($model);
 
         if ($functionExtraParametersTreatment !== null) {
@@ -240,10 +244,11 @@ abstract class CrudRepository {
         return $model;
     }
 
-     /**
+    /**
      * Other private functions.
      */
-    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false) {
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
+    {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
 
         // With
@@ -281,20 +286,22 @@ abstract class CrudRepository {
         return $clause;
     }
 
-    private static function buildQueryFromParams(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, $where = null): void {
+    private static function buildQueryFromParams(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, $where = null): void
+    {
         $struct = self::getParamsStructure($with, $order_by, $select, $where); // we generate the structure with the data that we receive
         self::processParamsStructure($clause, $struct);
         if ($where) {
             self::applyWhereConditionsToStructure($clause, $struct['where_conditions']);
         }
-    }   
+    }
 
     /**
      * Create an array processing params.
      */
 
     // PONER PRIVATE
-    public static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null): array {
+    public static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null): array
+    {
         $struct = [];
 
         if ($string_with) {
@@ -302,7 +309,7 @@ abstract class CrudRepository {
             foreach (explode(',', $string_with) as $with_segment) {
                 $current = &$struct;
                 foreach (explode('..', $with_segment) as $relation) {
-                    if (!isset($current['with'][$relation])) {
+                    if (! isset($current['with'][$relation])) {
                         $current['with'][$relation] = ['with' => []];
                     }
 
@@ -315,7 +322,7 @@ abstract class CrudRepository {
             // process $string_order_by
             foreach (explode(',', $string_order_by) as $order_by_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (!str_contains($order_by_segment, '.')) {
+                if (! str_contains($order_by_segment, '.')) {
                     $current = &$struct;
                     $parts = explode(':', $order_by_segment);
                     $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
@@ -329,7 +336,7 @@ abstract class CrudRepository {
                             $parts = explode(':', $relation_path);
                             $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
                             [$key, $order_by] = explode('.', $parts[0], 2);
-                            if (!array_key_exists($key, $current)) {
+                            if (! array_key_exists($key, $current)) {
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
 
@@ -337,7 +344,7 @@ abstract class CrudRepository {
                                 $order_by => $order_by_direction,
                             ];
                         } else {
-                            if (!array_key_exists($relation_path, $current)) {
+                            if (! array_key_exists($relation_path, $current)) {
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
 
@@ -352,7 +359,7 @@ abstract class CrudRepository {
             // process $string_select
             foreach (explode(',', $string_select) as $select_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (!str_contains($select_segment, '.')) {
+                if (! str_contains($select_segment, '.')) {
                     $current = &$struct;
                     $current['select'] = explode('|', $select_segment);
                 } else {
@@ -360,13 +367,13 @@ abstract class CrudRepository {
                     foreach (explode('..', $select_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
                             [$key, $select] = explode('.', $relation_path, 2);
-                            if (!array_key_exists($key, $current)) {
+                            if (! array_key_exists($key, $current)) {
                                 throw new Exception("You can't select field that are not in the relation."); // esto da error
                             }
 
                             $current[$key]['select'] = explode('|', $select);
                         } else {
-                            if (!array_key_exists($relation_path, $current)) {
+                            if (! array_key_exists($relation_path, $current)) {
                                 throw new Exception("You can't select field that are not in the relation."); // esto da error
                             }
 
@@ -378,7 +385,7 @@ abstract class CrudRepository {
         }
 
         if ($string_where) {
-            foreach(StringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) { // separamos condiciones separadas por ',' en ppio estas son diferemtes where() encadenados regentados por el path
+            foreach (StringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) { // separamos condiciones separadas por ',' en ppio estas son diferemtes where() encadenados regentados por el path
                 $filter_type = self::getFilterType($where_segment); // first, clean the segment
 
                 $or_conditions = StringDelimitersHelper::explodeOutsideRanges('||', $where_segment); // explotamos por || buscando condiciones OR
@@ -389,16 +396,16 @@ abstract class CrudRepository {
                         'groups' => [],
                     ];
 
-                    foreach($or_conditions as $or_condition) { // para cada condición OR
+                    foreach ($or_conditions as $or_condition) { // para cada condición OR
                         $and_conditions = StringDelimitersHelper::explodeOutsideRanges('&&', $or_condition); // explotamos por && en busca de condiciones AND, si las encontramos deberemos unirlas
 
                         $and_group = []; // * Definimos el grupo AND para ir llenándolo dentro del foreach con los diferentes segmentos AND encontrados
-                        foreach($and_conditions as $condition) {
+                        foreach ($and_conditions as $condition) {
                             $and_group[] = StructHelper::createConditionArray($condition); // habiéndo llegado a la condición simple, transformamos el string en un pequeño array con clave: key, operator, value, path
                         }
 
                         $condition_group['groups'][] = [
-                            'conditions' => $and_group
+                            'conditions' => $and_group,
                         ];
                     }
 
@@ -417,7 +424,7 @@ abstract class CrudRepository {
             //     if ($filter_type->isParentOrBoth()) {
             //         $full_relation_path = StructHelper::extractRelationPathFromWhereSegment($where_segment);
             //     }
-                
+
             //     foreach(StringDelimitersHelper::explodeOutsideRanges('..', $where_segment) as $relation_path) {
             //         //tengo que mirar si $relation_path contiene . para saber si tengo que procesar la condición
             //         $parts = StringDelimitersHelper::explodeOutsideRanges('.', $relation_path); // lo hacemos de esta manera porqué no nos interesa tener en cuenta puntos que se encuentren dentro de los delimitadores
@@ -436,10 +443,11 @@ abstract class CrudRepository {
     }
 
     // Extract de filter type to apply on condition
-    public static function getFilterType(string &$where_segment): FilterType {
+    public static function getFilterType(string &$where_segment): FilterType
+    {
         $parts = StringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
 
-        if(count($parts) === 1) {
+        if (count($parts) === 1) {
             return FilterType::Parent; // por defecto padre mejor
         }
 
@@ -452,14 +460,15 @@ abstract class CrudRepository {
     /**
      * Process the params structure.
      */
-    private static function processParamsStructure(mixed &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void {
+    private static function processParamsStructure(mixed &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    {
         // SELECT
-        if (!empty($struct['select'])) {
+        if (! empty($struct['select'])) {
             $clause->select(StructHelper::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
         }
 
         // ORDER BY
-        if (!empty($struct['order_by'])) {
+        if (! empty($struct['order_by'])) {
             $order_field = array_key_first($struct['order_by']);
             $direction = $struct['order_by'][$order_field];
             $clause->orderBy($order_field, $direction);
@@ -476,19 +485,19 @@ abstract class CrudRepository {
                 self::processParamsStructure($query, $config, $parent_model, $relation);
             });
 
-            
         }
     }
 
-    private static function applyWhereConditionsToStructure(mixed &$clause, array $where_conditions): void {
-        foreach($where_conditions as $condition_group) {
+    private static function applyWhereConditionsToStructure(mixed &$clause, array $where_conditions): void
+    {
+        foreach ($where_conditions as $condition_group) {
             $filter_type = $condition_group['filter_type']; // guardamos el filter_type de la condición
 
-            if (!empty($condition_group['or_group'])) {
+            if (! empty($condition_group['or_group'])) {
                 // estamos en una condición OR
                 $clause->where(function ($q) use ($condition_group, $filter_type) {
 
-                    foreach($condition_group['groups'] as $and_group) { // iteramos sobre los grupos or
+                    foreach ($condition_group['groups'] as $and_group) { // iteramos sobre los grupos or
                         $q->orWhere(function ($sub_q) use ($and_group, $filter_type) {
 
                             foreach ($and_group['conditions'] as $condition) { // iteramos sobre cada condición and
@@ -509,11 +518,12 @@ abstract class CrudRepository {
      */
     private static function processSimpleCondition(&$query, array $condition, FilterType $filter_type): void
     {
-        $has_path = !empty($condition['path']);
+        $has_path = ! empty($condition['path']);
         $relation_path = $has_path ? str_replace('..', '.', $condition['path']) : null;
 
-        if (!$has_path) {
+        if (! $has_path) {
             self::processConditionOperator($query, $condition);
+
             return;
         }
 
@@ -525,7 +535,7 @@ abstract class CrudRepository {
                 });
                 $query->with($relation_path); // --> esto sobreescribe las relaciones cargadas anteriormente
                 break;
-    
+
             case FilterType::Child:
                 // Sólo devuelve los hijos que cumplen con la condición
                 $query->with([$relation_path => function ($q) use ($condition) {
@@ -535,7 +545,7 @@ abstract class CrudRepository {
 
                 // lo único que cambia entre el filtro de padres e hijos es la manera en la que se hace el with y que en el filter parent se aplica el whereHas
                 // podemos hacer que filter_both ejecute ambos bloques y así no necesitamos poner explícitamente un case de filter_both
-    
+
             case FilterType::Both:
                 // Devuelve los padres que cumplen la condición y los hijos que también la cumplan
                 $query->whereHas($relation_path, function ($q) use ($condition) {
@@ -544,7 +554,7 @@ abstract class CrudRepository {
                     self::processConditionOperator($q, $condition);
                 }]);
                 break;
-    
+
             default:
                 throw new Exception("Unsupported filter type: {$filter_type->value}");
         }
@@ -553,7 +563,8 @@ abstract class CrudRepository {
     /**
      * Process diferent operators and build respective query
      */
-    private static function processConditionOperator(&$query, array $condition) {
+    private static function processConditionOperator(&$query, array $condition)
+    {
         $key = $condition['key'];
         $operator = $condition['operator'];
         $value = trim($condition['value'], '<{}>');
@@ -587,7 +598,7 @@ abstract class CrudRepository {
             case $operator === 'notNull':
                 $query->whereNotNull($key);
                 break;
-            
+
             case $operator === 'between':
                 $arr_values = self::parseMultipleValues($value);
                 if (count($arr_values) !== 2) {
@@ -623,7 +634,7 @@ abstract class CrudRepository {
     {
         return array_filter(
             array_map('trim', explode($separator, $raw_value)),
-            fn($v) => $v !== ''
+            fn ($v) => $v !== ''
         );
     }
 }

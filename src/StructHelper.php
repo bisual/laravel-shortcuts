@@ -11,12 +11,13 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
-class StructHelper {
-
-     /**
+class StructHelper
+{
+    /**
      * Build the select required fomat and fields.
      */
-    public static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array {
+    public static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
+    {
         return array_unique(array_merge( // array_unique if we get the id from the front
             ['id'],
             $select_fields,
@@ -43,25 +44,27 @@ class StructHelper {
     /**
      * Return the relation path from where condition.
      */
-    private static function extractRelationPathFromWhereSegment(string $where_segment): ?string { //profile..users.code[=]<{900}>
-        $key = self::extractFullKeyFromWhereSegment($where_segment); //profile..users.code
-    
+    private static function extractRelationPathFromWhereSegment(string $where_segment): ?string // profile..users.code[=]<{900}>
+    {$key = self::extractFullKeyFromWhereSegment($where_segment); // profile..users.code
+
         $last_dot = strrpos($key, '.');
 
         // we hare on the surface
         if ($last_dot === false) {
-            return null; 
+            return null;
         }
-    
+
         $path = substr($key, 0, $last_dot);
+
         return $path; // profile..users
     }
 
     /**
      * Build where condition skeleton.
      */
-    private static function buildWhereCondition(string $segment): array {
-        if (!str_contains($segment, '[') || !str_contains($segment, ']')) { //TODO: controlar que no estén dentro de los delimiters
+    private static function buildWhereCondition(string $segment): array
+    {
+        if (! str_contains($segment, '[') || ! str_contains($segment, ']')) { // TODO: controlar que no estén dentro de los delimiters
             throw new Exception("Invalid where condition format: '{$segment}'");
         }
         [$key, $rest] = explode('[', $segment, 2);
@@ -77,35 +80,36 @@ class StructHelper {
     /**
      * Return the key from where condition.
      */
-    private static function extractFullKeyFromWhereSegment(string $where_segment): string { // profile..users.code[=]<{900}>
-        [$key] = explode('[', $where_segment, 2);
-        if (!isset($key) || trim($key) === '') {
+    private static function extractFullKeyFromWhereSegment(string $where_segment): string // profile..users.code[=]<{900}>
+    {[$key] = explode('[', $where_segment, 2);
+        if (! isset($key) || trim($key) === '') {
             throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
         }
 
-        return $key; //profile..users.code
+        return $key; // profile..users.code
     }
-
 
     /**
      * Return the target column from path
      */
-    private static function getTargetColumnFromPath(string $where_path): string { // profile..details.code
-        $parts = explode('.', $where_path);
+    private static function getTargetColumnFromPath(string $where_path): string // profile..details.code
+    {$parts = explode('.', $where_path);
+
         return array_pop($parts); // code
     }
 
     /**
      * Get the $model->$relation foreign key data.
      */
-    private static function getForeignKeyData(Model $model, string $relation): array {
-        if (!method_exists($model, $relation)) {
+    private static function getForeignKeyData(Model $model, string $relation): array
+    {
+        if (! method_exists($model, $relation)) {
             throw new Exception("Relation '{$relation}' not found in model ".$model::class);
         }
 
         $relation_instance = $model->{$relation}();
 
-        if (!$relation_instance instanceof Relation) {
+        if (! $relation_instance instanceof Relation) {
             throw new Exception("Relation '{$relation}' not found in model ".$model::class);
         }
 
@@ -126,14 +130,12 @@ class StructHelper {
         return [];
     }
 
-
-    
     /**
      * GRAVEYARD
      */
-     /**
-     * Put a condition block into the structure.
-     */
+    /**
+    * Put a condition block into the structure.
+    */
     // public static function injectConditionsToStruct(string $where_segment, array $conditions, array &$current) {
     //     if (count($conditions) > 1) {
     //         $current['where_or'] = array_map(function ($or_condition) {

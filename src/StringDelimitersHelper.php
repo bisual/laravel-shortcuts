@@ -6,32 +6,38 @@ namespace Bisual\LaravelShortcuts;
 
 use Exception;
 
-class StringDelimitersHelper {
+class StringDelimitersHelper
+{
     private static array $delimiter_ranges = [];
 
     /**
      * ACCESSORS.
      */
-    private static function setDelimiterRanges(string $input, string $start = '<{', string $end = '}>'): void {
+    private static function setDelimiterRanges(string $input, string $start = '<{', string $end = '}>'): void
+    {
         self::$delimiter_ranges = self::getCustomDelimiterRanges($input, $start, $end);
     }
 
-    public static function getDelimiterRanges(): array {
+    public static function getDelimiterRanges(): array
+    {
         return self::$delimiter_ranges;
     }
 
     /**
      * Sets delimiter ranges from the input and then performs a smart explode.
      */
-    public static function explodeOutsideRanges( string $separator, string $input) {
+    public static function explodeOutsideRanges(string $separator, string $input)
+    {
         self::setDelimiterRanges($input);
+
         return self::smartExplode($separator, $input);
     }
 
     /**
      * Explode by custom separator checking to not separate if $separator is inside precomputed ranges.
      */
-    private static function smartExplode(string $separator, string $input): array {
+    private static function smartExplode(string $separator, string $input): array
+    {
         if (empty(self::$delimiter_ranges)) {
             throw new Exception('Delimiter ranges must be set before calling smartExplode');
         }
@@ -44,7 +50,7 @@ class StringDelimitersHelper {
         for ($i = 0; $i < $length; $i++) {
             $char = $input[$i];
 
-            if (substr($input, $i, $separator_length) === $separator && !self::isInsidePrecomputedRanges($i)) {
+            if (substr($input, $i, $separator_length) === $separator && ! self::isInsidePrecomputedRanges($i)) {
                 $segments[] = trim($buffer);
                 $buffer = '';
                 $i += $separator_length - 1;
@@ -63,7 +69,8 @@ class StringDelimitersHelper {
     /**
      * Check if position is inside ranges.
      */
-    private static function isInsidePrecomputedRanges(int $position): bool {
+    private static function isInsidePrecomputedRanges(int $position): bool
+    {
         foreach (self::$delimiter_ranges as [$start, $end]) {
             if ($position >= $start && $position < $end) {
                 return true;
@@ -76,7 +83,8 @@ class StringDelimitersHelper {
     /**
      * Get the position of the opening and closing dilimiter ranges of string.
      */
-    private static function getCustomDelimiterRanges(string $input, string $start, string $end): array {
+    private static function getCustomDelimiterRanges(string $input, string $start, string $end): array
+    {
         $ranges = [];
         $offset = 0;
 
