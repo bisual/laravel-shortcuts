@@ -5,18 +5,20 @@ declare(strict_types=1);
 namespace Bisual\LaravelShortcuts;
 
 use Bisual\LaravelShortcuts\Traits\HasUuid;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
 
 abstract class CrudRepository
 {
-    public static $model = Model::class;
+    public static string $model = Model::class;
 
     /*+
      * @params
@@ -24,7 +26,7 @@ abstract class CrudRepository
      *      - without
      *      - ... other attributes to filter
      */
-    public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
+    public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null): LengthAwarePaginator|Collection
     {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
@@ -69,8 +71,7 @@ abstract class CrudRepository
                 unset($params['append']);
             }
 
-            // Extra parameters treatment
-            if ($functionExtraParametersTreatment !== null) {
+            if (is_callable($functionExtraParametersTreatment)) {
                 $functionExtraParametersTreatment($clause, $params);
             }
 
@@ -178,9 +179,9 @@ abstract class CrudRepository
             }
 
             return $data;
-        } elseif ($functionExtraParametersTreatment !== null) {
+        } else if (is_callable($functionExtraParametersTreatment)) {
             $clause = (static::$model)::query();
-            if ($functionExtraParametersTreatment !== null) {
+            if (is_callable($functionExtraParametersTreatment)) {
                 $functionExtraParametersTreatment($clause, $params);
             }
 
@@ -195,7 +196,7 @@ abstract class CrudRepository
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
 
-        if ($functionExtraParametersTreatment !== null) {
+        if (is_callable($functionExtraParametersTreatment)) {
             $functionExtraParametersTreatment($clause, $params);
         }
 
@@ -244,7 +245,7 @@ abstract class CrudRepository
     {
         $model = self::show($model);
 
-        if ($functionExtraParametersTreatment !== null) {
+        if (is_callable($functionExtraParametersTreatment)) {
             $functionExtraParametersTreatment($model->id);
         }
 

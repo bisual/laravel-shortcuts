@@ -4,7 +4,7 @@ namespace Bisual\LaravelShortcuts;
 
 class ControllerValidationHelper
 {
-    private static $defaultValidationParameters = [
+    private static array $defaultValidationParameters = [
         'search' => 'string|nullable',
         'with' => 'string',
         'without' => 'string',
@@ -16,7 +16,7 @@ class ControllerValidationHelper
         'scopes' => 'string',
     ];
 
-    public static function indexQueryParametersValidation(array $params = [])
+    public static function indexQueryParametersValidation(array $params = []): array
     {
         return array_merge(self::$defaultValidationParameters, $params);
     }

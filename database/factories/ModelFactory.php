@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /*
 class ModelFactory extends Factory
 {
-    protected $model = YourModel::class;
+    protected string $model = YourModel::class;
 
-    public function definition()
+    public function definition(): array
     {
         return [
 

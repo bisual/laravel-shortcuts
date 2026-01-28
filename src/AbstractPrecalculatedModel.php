@@ -2,7 +2,7 @@
 
 namespace Bisual\LaravelShortcuts;
 
-use Carbon\Carbon;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -38,14 +38,14 @@ abstract class AbstractPrecalculatedModel
      */
 
     // Refreshes the whole model
-    final public function refresh()
+    final public function refresh(): void
     {
         $data = $this->calc();
         $this->set($data);
     }
 
     // Adds a new iteration without having to refresh the whole model
-    abstract public function add(array $array);
+    abstract public function add(array $array): void;
 
     /**
      * PUBLIC METHODS
@@ -125,7 +125,7 @@ abstract class AbstractPrecalculatedModel
         }); // 15s waiting to try again
     }
 
-    final protected function generateDaysArray(Carbon $from, Carbon $to)
+    final protected function generateDaysArray(Carbon $from, Carbon $to): array
     {
         $res = [];
         $it = $from->copy();
@@ -140,21 +140,21 @@ abstract class AbstractPrecalculatedModel
     /**
      * PRIVATE METHODS
      */
-    private function getDataKey()
+    private function getDataKey(): string
     {
         return $this->base_key.'_data';
     }
 
-    private function getUpdatedAtKey()
+    private function getUpdatedAtKey(): string
     {
         return $this->base_key.'_updated_at';
     }
 
-    private static function createKey(array $params)
+    private static function createKey(array $params): string
     {
         $res = static::$BASE_KEY_TEMPLATE;
         foreach ($params as $key => $val) {
-            $res = str_replace("{{{$key}}}", $val, $res);
+            $res = str($res)->replace(search: "{{{$key}}}", replace: $val)->toString();
         }
 
         return $res;
