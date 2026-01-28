@@ -71,7 +71,7 @@ abstract class CrudController extends BaseController
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
-        } else if (is_subclass_of(static::$storeRequestClass, FormRequest::class)) {
+        } elseif (is_subclass_of(static::$storeRequestClass, FormRequest::class)) {
             $data = $this->handleFormRequestValidation($request, static::$storeRequestClass);
         } else {
             $data = $request->all();
@@ -94,7 +94,7 @@ abstract class CrudController extends BaseController
 
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
-        } else if (is_subclass_of(static::$updateRequestClass, FormRequest::class)) {
+        } elseif (is_subclass_of(static::$updateRequestClass, FormRequest::class)) {
             $data = $this->handleFormRequestValidation($request, static::$updateRequestClass);
         } else {
             $data = $request->all();

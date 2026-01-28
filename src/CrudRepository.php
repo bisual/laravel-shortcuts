@@ -179,7 +179,7 @@ abstract class CrudRepository
             }
 
             return $data;
-        } else if (is_callable($functionExtraParametersTreatment)) {
+        } elseif (is_callable($functionExtraParametersTreatment)) {
             $clause = (static::$model)::query();
             if (is_callable($functionExtraParametersTreatment)) {
                 $functionExtraParametersTreatment($clause, $params);
