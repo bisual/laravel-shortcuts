@@ -18,6 +18,7 @@ final class LaravelShortcutsServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('laravel-shortcuts');
+            ->name('laravel-shortcuts')
+            ->hasCommand(MakeRepositoryCommand::class);
     }
 }
