@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DummyNamespace;
+
+use DummyDtoFqcn;
+use Illuminate\Foundation\Http\FormRequest;
+
+class DummyClass extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            //
+        ];
+    }
+
+    public function toDto(): DummyDtoClass
+    {
+        return new DummyDtoClass($this->validated());
+    }
+}
