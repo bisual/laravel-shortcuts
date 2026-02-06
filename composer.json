@@ -21,9 +21,7 @@
         "spatie/laravel-package-tools": "^1.14.0"
     },
     "require-dev": {
-        "illuminate/cache": "^12.0",
-        "illuminate/log": "^12.0",
-        "illuminate/support": "^12.0",
+        "laravel/framework": "^12.0",
         "laravel/pint": "^1.0",
         "rector/rector": "^2.0"
     },
