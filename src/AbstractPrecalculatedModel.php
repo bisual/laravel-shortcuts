@@ -25,16 +25,12 @@ abstract class AbstractPrecalculatedModel
     // la template de la key sin parámetros aplicados. Las variables serán envueltas entre doble claudators: {{var}} . Ejemplo: "ecommerce_total_last_30_days_branch_{{branch_id}}"
     protected static string $BASE_KEY_TEMPLATE;
 
-    // We save $params for query purposes
-    protected array $params;
-
     // This is the key with the parameters replaced
-    private string $base_key;
+    private readonly string $base_key;
 
-    final public function __construct(array $params)
+    final public function __construct(protected array $params)
     {
-        $this->params = $params;
-        $this->base_key = $this->createKey($params);
+        $this->base_key = $this->createKey($this->params);
     }
 
     // Adds a new iteration without having to refresh the whole model
@@ -72,28 +68,28 @@ abstract class AbstractPrecalculatedModel
 
         while ($attempt < $maxAttempts) {
             try {
-                Log::info(get_class($this).' - trying to read key '.$this->getDataKey().' from cache - attempt '.$attempt);
+                Log::info(static::class.' - trying to read key '.$this->getDataKey().' from cache - attempt '.$attempt);
                 // Si la clave existe en caché se retorna el valor cacheado
                 if ($this->check()) {
-                    Log::info(get_class($this).' - successfuly read key '.$this->getDataKey().' from cache in attempt '.$attempt);
+                    Log::info(static::class.' - successfuly read key '.$this->getDataKey().' from cache in attempt '.$attempt);
 
                     return json_decode(Cache::get($this->getDataKey()), true);
                 }
 
-                Log::info(get_class($this).' - key '.$this->getDataKey().' is not in cache, refreshing');
+                Log::info(static::class.' - key '.$this->getDataKey().' is not in cache, refreshing');
                 // Si la clave no existe, realiza un refresh y termina el bucle
                 $this->refresh();
 
                 return json_decode(Cache::get($this->getDataKey()), true);
             } catch (Exception $e) {
-                Log::error(get_class($this).' - Error getting key '.$this->getDataKey().' from cache: '.$e->getMessage());
+                Log::error(static::class.' - Error getting key '.$this->getDataKey().' from cache: '.$e->getMessage());
                 $attempt++;
 
                 sleep(1);
             }
         }
 
-        Log::info(get_class($this).' - refreshing key '.$this->getDataKey().' from cache after read error');
+        Log::info(static::class.' - refreshing key '.$this->getDataKey().' from cache after read error');
         // Si fallaron todos los intentos, llama a refresh
         $this->refresh();
 
@@ -120,14 +116,14 @@ abstract class AbstractPrecalculatedModel
         retry(
             times: 5,
             callback: function () use ($data): void {
-                Log::debug(get_class($this).' - Set() attempt');
+                Log::debug(static::class.' - Set() attempt');
                 Cache::set($this->getDataKey(), json_encode($data));
                 Cache::set($this->getUpdatedAtKey(), Carbon::now()->timestamp);
-                Log::debug(get_class($this).' - Set() attempt successful');
+                Log::debug(static::class.' - Set() attempt successful');
             },
             sleepMilliseconds: 15000,
             when: function (Throwable $exception): Throwable {
-                Log::error(get_class($this).' - Exception during attempt: '.$exception->getMessage());
+                Log::error(static::class.' - Exception during attempt: '.$exception->getMessage());
 
                 return $exception;
             },
@@ -146,7 +142,7 @@ abstract class AbstractPrecalculatedModel
         return $res;
     }
 
-    private static function createKey(array $params): string
+    private function createKey(array $params): string
     {
         $res = static::$BASE_KEY_TEMPLATE;
         foreach ($params as $key => $val) {

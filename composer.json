@@ -37,6 +37,10 @@
     },
     "scripts": {
         "format": "vendor/bin/pint",
+        "lint": [
+            "@composer format",
+            "@composer rector"
+        ],
         "rector": "vendor/bin/rector process"
     },
     "config": {

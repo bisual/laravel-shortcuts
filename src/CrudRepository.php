@@ -81,8 +81,8 @@ abstract class CrudRepository
 
                 foreach ($params as $attr => $val) {
                     if ($val !== null && $val !== '') {
-                        if (str_contains($attr, '-')) {
-                            $separate = explode('-', $attr);
+                        if (str_contains((string) $attr, '-')) {
+                            $separate = explode('-', (string) $attr);
                             $relations = implode('-', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
                             $table = (new static::$model)->{$relations}()->getRelated()->getTable();
@@ -91,8 +91,8 @@ abstract class CrudRepository
                                     $q->whereNull($table.'.'.$attribute);
                                 } elseif ($val === 'notnull') {
                                     $q->whereNotNull($table.'.'.$attribute);
-                                } elseif (str_contains($val, ',')) {
-                                    $q->whereIn($table.'.'.$attribute, explode(',', $val));
+                                } elseif (str_contains((string) $val, ',')) {
+                                    $q->whereIn($table.'.'.$attribute, explode(',', (string) $val));
                                 } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                                     $q->where($table.'.'.$attribute, $val);
                                 } else {
@@ -104,7 +104,7 @@ abstract class CrudRepository
                         } elseif ($val === 'notnull') {
                             $clause->whereNotNull($attr);
                         } elseif (str_contains((string) $val, ',')) {
-                            $clause->whereIn($attr, explode(',', $val));
+                            $clause->whereIn($attr, explode(',', (string) $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                             $whereClause[] = [$attr, $val];
                         } elseif ($record->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
@@ -133,7 +133,7 @@ abstract class CrudRepository
 
             // Process Without
             if ($without) {
-                foreach (explode(',', $without) as $w) {
+                foreach (explode(',', (string) $without) as $w) {
                     $clause->without($w);
                 }
             }
@@ -219,7 +219,7 @@ abstract class CrudRepository
         $record = $clause->firstOrFail();
 
         if (isset($params['append']) && $params['append'] !== '') {
-            foreach (explode(',', $params['append']) as $append) {
+            foreach (explode(',', (string) $params['append']) as $append) {
                 $record->append($append);
             }
         }
