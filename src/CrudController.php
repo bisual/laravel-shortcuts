@@ -59,12 +59,13 @@ abstract class CrudController extends BaseController
 
     public function show(Request $request, int|string $id): JsonResponse
     {
-        $item = static::$repository::show($id, $request->query());
+        $record = static::$repository::show($id, $request->query());
+
         if (static::$authorize['show']) {
-            $this->authorize('view', $item);
+            $this->authorize('view', $record);
         }
 
-        return response()->json($item);
+        return response()->json($record);
     }
 
     public function store(Request $request, ?callable $functionExtraParametersTreatment = null): JsonResponse
@@ -90,7 +91,7 @@ abstract class CrudController extends BaseController
 
     public function update(Request $request, int|string $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
     {
-        $item = (static::$repository)::show($id);
+        $record = (static::$repository)::show($id);
 
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
@@ -101,28 +102,29 @@ abstract class CrudController extends BaseController
         }
 
         if (static::$authorize['update']) {
-            $this->authorize('update', [$item, $data]);
+            $this->authorize('update', [$record, $data]);
         }
 
         if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($item, $data);
+            $functionExtraParametersTreatment($record, $data);
         }
 
-        return response()->json((static::$repository)::update($item, $data));
+        return response()->json((static::$repository)::update($record, $data));
     }
 
-    public function destroy(Request $request, int|string $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
+    public function destroy(int|string|Model $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
     {
-        $item = (static::$repository)::show($id);
+        $record = (static::$repository)::show($id);
+
         if (static::$authorize['destroy']) {
-            $this->authorize('delete', $item);
+            $this->authorize('delete', $record);
         }
 
         if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($item);
+            $functionExtraParametersTreatment($record);
         }
 
-        return response()->json((static::$repository)::destroy($item));
+        return response()->json((static::$repository)::destroy($record));
     }
 
     private function handleFormRequestValidation(Request $request, string $requestClass): array

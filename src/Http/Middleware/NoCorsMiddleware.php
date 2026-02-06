@@ -3,10 +3,12 @@
 namespace Bisual\LaravelShortcuts\Http\Middleware;
 
 use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class NoCorsMiddleware
 {
-    public function handle($request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
         $headers = [
             'Access-Control-Allow-Origin' => '*',
