@@ -9,10 +9,10 @@ use Illuminate\Support\Str;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputOption;
 
-#[AsCommand(name: 'make:repository')]
+#[AsCommand(name: 'make:shortcuts-repository')]
 final class MakeRepositoryCommand extends GeneratorCommand
 {
-    protected $name = 'make:repository';
+    protected $name = 'make:shortcuts-repository';
 
     protected $description = 'Create a new repository class (optionally extending CrudRepository with --model)';
 
