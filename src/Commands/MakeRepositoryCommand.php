@@ -38,15 +38,6 @@ final class MakeRepositoryCommand extends GeneratorCommand
         return $this->resolveStubPath($stub);
     }
 
-    protected function resolveStubPath(string $stub): string
-    {
-        $customPath = $this->laravel->basePath(mb_trim($stub, '/'));
-
-        return $this->files->exists($customPath)
-            ? $customPath
-            : __DIR__.'/..'.$stub;
-    }
-
     protected function getDefaultNamespace($rootNamespace): string
     {
         return $rootNamespace.'\\Repositories';
@@ -81,5 +72,14 @@ final class MakeRepositoryCommand extends GeneratorCommand
         return [
             'name' => ['What should the repository be named?', 'E.g. UserRepository'],
         ];
+    }
+
+    private function resolveStubPath(string $stub): string
+    {
+        $customPath = $this->laravel->basePath(mb_trim($stub, '/'));
+
+        return $this->files->exists($customPath)
+            ? $customPath
+            : __DIR__.'/..'.$stub;
     }
 }

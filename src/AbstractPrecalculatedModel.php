@@ -73,14 +73,14 @@ abstract class AbstractPrecalculatedModel
                 if ($this->check()) {
                     Log::info(static::class.' - successfuly read key '.$this->getDataKey().' from cache in attempt '.$attempt);
 
-                    return json_decode(Cache::get($this->getDataKey()), true);
+                    return json_decode((string) Cache::get($this->getDataKey()), true);
                 }
 
                 Log::info(static::class.' - key '.$this->getDataKey().' is not in cache, refreshing');
                 // Si la clave no existe, realiza un refresh y termina el bucle
                 $this->refresh();
 
-                return json_decode(Cache::get($this->getDataKey()), true);
+                return json_decode((string) Cache::get($this->getDataKey()), true);
             } catch (Exception $e) {
                 Log::error(static::class.' - Error getting key '.$this->getDataKey().' from cache: '.$e->getMessage());
                 $attempt++;
@@ -93,7 +93,7 @@ abstract class AbstractPrecalculatedModel
         // Si fallaron todos los intentos, llama a refresh
         $this->refresh();
 
-        return json_decode(Cache::get($this->getDataKey()), true);
+        return json_decode((string) Cache::get($this->getDataKey()), true);
     }
 
     final public function getWithoutCache(array $params): array

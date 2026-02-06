@@ -60,7 +60,7 @@ final class LintCommand extends Command
 
         $this->info('🎨 Running Pint against branch: '.$baseBranch.'...');
         $pintStartTime = now();
-        passthru('./vendor/bin/pint --diff='.escapeshellarg($baseBranch));
+        passthru('./vendor/bin/pint --diff='.escapeshellarg((string) $baseBranch));
         $pintTime = $pintStartTime->diffInSeconds(now(), absolute: true);
         $this->info('✅ Pint completed in '.Number::format($pintTime, 2).' seconds');
 

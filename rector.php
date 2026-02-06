@@ -23,7 +23,6 @@ return RectorConfig::configure()
         RemoveUnusedPrivateMethodRector::class,
         FlipTypeControlToUseExclusiveTypeRector::class,
         AddOverrideAttributeToOverriddenMethodsRector::class,
-        __DIR__.'/database/migrations',
     ])
     ->withRules([
         DeclareStrictTypesRector::class,
@@ -34,4 +33,4 @@ return RectorConfig::configure()
         typeDeclarations: true,
         privatization: true,
     )
-    ->withPhpSets(php84: true);
+    ->withPhpSets();
