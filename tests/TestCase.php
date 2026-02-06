@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts\Tests;
 
 use Bisual\LaravelShortcuts\LaravelShortcutsServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
 
-class TestCase extends Orchestra
+final class TestCase extends Orchestra
 {
     protected function setUp(): void
     {
@@ -17,15 +19,15 @@ class TestCase extends Orchestra
         });
     }
 
+    public function getEnvironmentSetUp($app): void
+    {
+        config()->set('database.default', 'testing');
+    }
+
     protected function getPackageProviders($app): array
     {
         return [
             LaravelShortcutsServiceProvider::class,
         ];
-    }
-
-    public function getEnvironmentSetUp($app): void
-    {
-        config()->set('database.default', 'testing');
     }
 }

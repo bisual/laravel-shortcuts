@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Stringable;
 
-class Helper
+final class Helper
 {
     public static function replaceTextVariablesByRegexUsingStr(string|Stringable $template, string $pattern, string $repository): string|Stringable
     {

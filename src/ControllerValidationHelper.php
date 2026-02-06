@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
-class ControllerValidationHelper
+final class ControllerValidationHelper
 {
     private static array $defaultValidationParameters = [
         'search' => 'string|nullable',

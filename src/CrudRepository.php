@@ -26,7 +26,7 @@ abstract class CrudRepository
      *      - without
      *      - ... other attributes to filter
      */
-    public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null): LengthAwarePaginator|Collection
+    final public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null): LengthAwarePaginator|Collection
     {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
@@ -199,7 +199,7 @@ abstract class CrudRepository
             : (static::$model)::query()->get();
     }
 
-    public static function show(int|string|Model $id, array $params = [], ?callable $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false): Model
+    final public static function show(int|string|Model $id, array $params = [], ?callable $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false): Model
     {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
@@ -227,12 +227,12 @@ abstract class CrudRepository
         return $record;
     }
 
-    public static function store(array $data): Model
+    final public static function store(array $data): Model
     {
         return (static::$model)::query()->create($data);
     }
 
-    public static function update(Model $record, array $params): Model
+    final public static function update(Model $record, array $params): Model
     {
         $record = self::show($record);
 
@@ -241,7 +241,7 @@ abstract class CrudRepository
         return $record->fresh();
     }
 
-    public static function destroy(int|string|Model $record, ?callable $functionExtraParametersTreatment = null): Model
+    final public static function destroy(int|string|Model $record, ?callable $functionExtraParametersTreatment = null): Model
     {
         $record = self::show($record);
 

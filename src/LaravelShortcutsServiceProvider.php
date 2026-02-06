@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
-use Bisual\LaravelShortcuts\Commands\LaravelShortcutsCommand;
+use Bisual\LaravelShortcuts\Commands\MakeRepositoryCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
-class LaravelShortcutsServiceProvider extends PackageServiceProvider
+final class LaravelShortcutsServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
@@ -17,9 +19,5 @@ class LaravelShortcutsServiceProvider extends PackageServiceProvider
          */
         $package
             ->name('laravel-shortcuts');
-        // ->hasConfigFile()
-        // ->hasViews()
-        // ->hasMigration('create_laravel-shortcuts_table')
-        // ->hasCommand(LaravelShortcutsCommand::class);
     }
 }

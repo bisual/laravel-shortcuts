@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
+use Exception;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -22,17 +25,31 @@ abstract class AbstractPrecalculatedModel
     // la template de la key sin parámetros aplicados. Las variables serán envueltas entre doble claudators: {{var}} . Ejemplo: "ecommerce_total_last_30_days_branch_{{branch_id}}"
     protected static string $BASE_KEY_TEMPLATE;
 
-    // This is the key with the parameters replaced
-    private string $base_key;
-
     // We save $params for query purposes
     protected array $params;
+
+    // This is the key with the parameters replaced
+    private string $base_key;
 
     final public function __construct(array $params)
     {
         $this->params = $params;
         $this->base_key = $this->createKey($params);
     }
+
+    // Adds a new iteration without having to refresh the whole model
+    abstract public function add(array $array): void;
+
+    /**
+     * PROTECTED METHODS
+     */
+
+    /**
+     * Calculates and returns the new data
+     *
+     * @param  $params  is used for when is called from getWithoutCache() function
+     */
+    abstract protected function calc(?array $params = null): array;
 
     /**
      * ABSTRACT METHODS TO IMPLEMENT
@@ -44,9 +61,6 @@ abstract class AbstractPrecalculatedModel
         $data = $this->calc();
         $this->set($data);
     }
-
-    // Adds a new iteration without having to refresh the whole model
-    abstract public function add(array $array): void;
 
     /**
      * PUBLIC METHODS
@@ -71,7 +85,7 @@ abstract class AbstractPrecalculatedModel
                 $this->refresh();
 
                 return json_decode(Cache::get($this->getDataKey()), true);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error(get_class($this).' - Error getting key '.$this->getDataKey().' from cache: '.$e->getMessage());
                 $attempt++;
 
@@ -100,17 +114,6 @@ abstract class AbstractPrecalculatedModel
     {
         return Carbon::createFromTimestamp(Cache::get($this->getUpdatedAtKey()));
     }
-
-    /**
-     * PROTECTED METHODS
-     */
-
-    /**
-     * Calculates and returns the new data
-     *
-     * @param  $params  is used for when is called from getWithoutCache() function
-     */
-    abstract protected function calc(?array $params = null): array;
 
     final protected function set(array $data): void
     {
@@ -143,6 +146,16 @@ abstract class AbstractPrecalculatedModel
         return $res;
     }
 
+    private static function createKey(array $params): string
+    {
+        $res = static::$BASE_KEY_TEMPLATE;
+        foreach ($params as $key => $val) {
+            $res = str($res)->replace(search: "{{{$key}}}", replace: $val)->toString();
+        }
+
+        return $res;
+    }
+
     /**
      * PRIVATE METHODS
      */
@@ -154,15 +167,5 @@ abstract class AbstractPrecalculatedModel
     private function getUpdatedAtKey(): string
     {
         return $this->base_key.'_updated_at';
-    }
-
-    private static function createKey(array $params): string
-    {
-        $res = static::$BASE_KEY_TEMPLATE;
-        foreach ($params as $key => $val) {
-            $res = str($res)->replace(search: "{{{$key}}}", replace: $val)->toString();
-        }
-
-        return $res;
     }
 }
