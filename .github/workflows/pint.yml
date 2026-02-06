@@ -1,0 +1,68 @@
+name: Pint
+
+on:
+  pull_request:
+    branches: [develop, main, sprint_*]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.draft == false
+
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [8.4]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: json, dom, curl, libxml, mbstring
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-scripts
+
+      - name: Get changed PHP files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.event.pull_request.base.ref }}"
+          else
+            BASE="origin/main"
+          fi
+
+          git fetch origin
+
+          CHANGED=$(git diff --name-only $BASE...HEAD -- '*.php' | grep -E '^(src|config|database|tests)/.*\.php$' || true)
+
+          VALID_FILES=""
+          for file in $CHANGED; do
+            if [[ -f "$file" ]]; then
+              VALID_FILES="$VALID_FILES $file"
+            fi
+          done
+
+          echo "CHANGED_FILES=$VALID_FILES" >> $GITHUB_ENV
+
+      - name: Install Pint
+        run: composer global require laravel/pint
+
+      - name: Run Pint on changed files
+        if: env.CHANGED_FILES != ''
+        run: |
+          echo "$CHANGED_FILES" | xargs -r pint --test
