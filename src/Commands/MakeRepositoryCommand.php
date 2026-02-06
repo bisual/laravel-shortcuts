@@ -63,8 +63,8 @@ final class MakeRepositoryCommand extends GeneratorCommand
         $model = $this->qualifyModel($this->option('model'));
 
         return Str::of($stub)
-            ->replace('DummyNamespacedModel', $model)
-            ->replace('DummyModel', class_basename($model))
+            ->replace('PlaceholderNamespacedModel', $model)
+            ->replace('PlaceholderModel', class_basename($model))
             ->toString();
     }
 

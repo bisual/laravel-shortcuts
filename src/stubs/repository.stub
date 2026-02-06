@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace DummyNamespace;
+namespace PlaceholderNamespace;
 
 use Bisual\LaravelShortcuts\CrudRepository;
-use DummyNamespacedModel;
+use PlaceholderNamespacedModel;
 
-class DummyClass extends CrudRepository
+class PlaceholderClass extends CrudRepository
 {
-    /** @var class-string<DummyModel> */
-    public static string $model = DummyModel::class;
+    /** @var class-string<PlaceholderModel> */
+    public static string $model = PlaceholderModel::class;
 }

@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-namespace DummyNamespace;
+namespace PlaceholderNamespace;
 
-class DummyClass
+class PlaceholderClass
 {
 }
