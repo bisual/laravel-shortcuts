@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bisual\LaravelShortcuts;
 
+use Bisual\LaravelShortcuts\Commands\MakeDtoCommand;
 use Bisual\LaravelShortcuts\Commands\MakeRepositoryCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -19,6 +20,7 @@ final class LaravelShortcutsServiceProvider extends PackageServiceProvider
          */
         $package
             ->name('laravel-shortcuts')
+            ->hasCommand(MakeDtoCommand::class)
             ->hasCommand(MakeRepositoryCommand::class);
     }
 }
