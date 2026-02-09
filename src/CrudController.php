@@ -38,7 +38,7 @@ abstract class CrudController extends BaseController
 
     public static array|string|FormRequest $updateRequestClass = Request::class; // pot ser un array de validacions també
 
-    final public function index(Request $request, ?callable $functionExtraParametersTreatment = null): AnonymousResourceCollection
+    public function index(Request $request, ?callable $functionExtraParametersTreatment = null): AnonymousResourceCollection
     {
         if (static::$authorize['index']) {
             $this->authorize('viewAny', [static::$model, $request->query()]);
@@ -57,7 +57,7 @@ abstract class CrudController extends BaseController
         return JsonResource::collection((static::$repository)::index($params, paginate: array_key_exists('page', $params)));
     }
 
-    final public function show(Request $request, int|string $id): JsonResponse
+    public function show(Request $request, int|string $id): JsonResponse
     {
         $record = static::$repository::show($id, $request->query());
 
@@ -68,7 +68,7 @@ abstract class CrudController extends BaseController
         return response()->json($record);
     }
 
-    final public function store(Request $request, ?callable $functionExtraParametersTreatment = null): JsonResponse
+    public function store(Request $request, ?callable $functionExtraParametersTreatment = null): JsonResponse
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
@@ -89,7 +89,7 @@ abstract class CrudController extends BaseController
         return response()->json((static::$repository)::store($data));
     }
 
-    final public function update(Request $request, int|string $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
+    public function update(Request $request, int|string $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
     {
         $record = (static::$repository)::show($id);
 
@@ -112,7 +112,7 @@ abstract class CrudController extends BaseController
         return response()->json((static::$repository)::update($record, $data));
     }
 
-    final public function destroy(int|string|Model $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
+    public function destroy(int|string|Model $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
     {
         $record = (static::$repository)::show($id);
 
