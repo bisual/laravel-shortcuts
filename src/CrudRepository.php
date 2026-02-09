@@ -26,7 +26,7 @@ abstract class CrudRepository
      *      - without
      *      - ... other attributes to filter
      */
-    public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null): LengthAwarePaginator|Collection
+    public static function index(array $params = [], bool $paginate = false, ?callable $callback = null): LengthAwarePaginator|Collection
     {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
@@ -71,8 +71,8 @@ abstract class CrudRepository
                 unset($params['append']);
             }
 
-            if (is_callable($functionExtraParametersTreatment)) {
-                $functionExtraParametersTreatment($clause, $params);
+            if (is_callable($callback)) {
+                $callback($clause, $params);
             }
 
             $whereClause = [];
@@ -182,11 +182,11 @@ abstract class CrudRepository
             return $records;
         }
 
-        if (is_callable($functionExtraParametersTreatment)) {
+        if (is_callable($callback)) {
             $clause = (static::$model)::query();
 
-            if (is_callable($functionExtraParametersTreatment)) {
-                $functionExtraParametersTreatment($clause, $params);
+            if (is_callable($callback)) {
+                $callback($clause, $params);
             }
 
             return $paginate
@@ -199,13 +199,13 @@ abstract class CrudRepository
             : (static::$model)::query()->get();
     }
 
-    public static function show(int|string|Model $id, array $params = [], ?callable $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false): Model
+    public static function show(int|string|Model $id, array $params = [], ?callable $callback = null, bool $withoutGlobalScopes = false): Model
     {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
 
-        if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($clause, $params);
+        if (is_callable($callback)) {
+            $callback($clause, $params);
         }
 
         $idIsModel = $id instanceof Model && $id::class === static::$model;
@@ -241,12 +241,12 @@ abstract class CrudRepository
         return $record->fresh();
     }
 
-    public static function destroy(int|string|Model $record, ?callable $functionExtraParametersTreatment = null): Model
+    public static function destroy(int|string|Model $record, ?callable $callback = null): Model
     {
         $record = self::show($record);
 
-        if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($record->id);
+        if (is_callable($callback)) {
+            $callback($record->id);
         }
 
         $record->delete();

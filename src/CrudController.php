@@ -38,7 +38,7 @@ abstract class CrudController extends BaseController
 
     public static array|string|FormRequest $updateRequestClass = Request::class; // pot ser un array de validacions també
 
-    public function index(Request $request, ?callable $functionExtraParametersTreatment = null): AnonymousResourceCollection
+    public function index(Request $request, ?callable $callback = null): AnonymousResourceCollection
     {
         if (static::$authorize['index']) {
             $this->authorize('viewAny', [static::$model, $request->query()]);
@@ -50,8 +50,8 @@ abstract class CrudController extends BaseController
             $params = $request->query();
         }
 
-        if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($params);
+        if (is_callable($callback)) {
+            $callback($params);
         }
 
         return JsonResource::collection((static::$repository)::index($params, paginate: array_key_exists('page', $params)));
@@ -68,7 +68,7 @@ abstract class CrudController extends BaseController
         return response()->json($record);
     }
 
-    public function store(Request $request, ?callable $functionExtraParametersTreatment = null): JsonResponse
+    public function store(Request $request, ?callable $callback = null): JsonResponse
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
@@ -82,14 +82,14 @@ abstract class CrudController extends BaseController
             $this->authorize('create', [static::$model, $data]);
         }
 
-        if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($data);
+        if (is_callable($callback)) {
+            $callback($data);
         }
 
         return response()->json((static::$repository)::store($data));
     }
 
-    public function update(Request $request, int|string $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
+    public function update(Request $request, int|string $id, ?callable $callback = null): JsonResponse
     {
         $record = (static::$repository)::show($id);
 
@@ -105,14 +105,14 @@ abstract class CrudController extends BaseController
             $this->authorize('update', [$record, $data]);
         }
 
-        if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($record, $data);
+        if (is_callable($callback)) {
+            $callback($record, $data);
         }
 
         return response()->json((static::$repository)::update($record, $data));
     }
 
-    public function destroy(int|string|Model $id, ?callable $functionExtraParametersTreatment = null): JsonResponse
+    public function destroy(int|string|Model $id, ?callable $callback = null): JsonResponse
     {
         $record = (static::$repository)::show($id);
 
@@ -120,8 +120,8 @@ abstract class CrudController extends BaseController
             $this->authorize('delete', $record);
         }
 
-        if (is_callable($functionExtraParametersTreatment)) {
-            $functionExtraParametersTreatment($record);
+        if (is_callable($callback)) {
+            $callback($record);
         }
 
         return response()->json((static::$repository)::destroy($record));
