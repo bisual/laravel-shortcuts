@@ -232,11 +232,11 @@ abstract class CrudRepository
         return (static::$model)::query()->create($data);
     }
 
-    public static function update(Model $record, array $params): Model
+    public static function update(int|string|Model $id, array $data): Model
     {
-        $record = self::show($record);
+        $record = self::show($id);
 
-        $record->update($params);
+        $record->update($data);
 
         return $record->fresh();
     }
