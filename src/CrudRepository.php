@@ -81,7 +81,7 @@ abstract class CrudRepository
 
                 foreach ($params as $attr => $val) {
                     if ($val !== null && $val !== '') {
-                        if (str_contains((string) $attr, '-')) {
+                        if (str($attr)->contains('-')) {
                             $separate = explode('-', (string) $attr);
                             $relations = implode('-', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
@@ -91,7 +91,7 @@ abstract class CrudRepository
                                     $q->whereNull($table.'.'.$attribute);
                                 } elseif ($val === 'notnull') {
                                     $q->whereNotNull($table.'.'.$attribute);
-                                } elseif (str_contains((string) $val, ',')) {
+                                } elseif (str($val)->contains(',')) {
                                     $q->whereIn($table.'.'.$attribute, explode(',', (string) $val));
                                 } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                                     $q->where($table.'.'.$attribute, $val);
@@ -103,7 +103,7 @@ abstract class CrudRepository
                             $whereClause[] = [$attr, null]; // $q->whereNull($attribute);
                         } elseif ($val === 'notnull') {
                             $clause->whereNotNull($attr);
-                        } elseif (str_contains((string) $val, ',')) {
+                        } elseif (str($val)->contains(',')) {
                             $clause->whereIn($attr, explode(',', (string) $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                             $whereClause[] = [$attr, $val];
@@ -349,7 +349,7 @@ abstract class CrudRepository
             // process $string_order_by
             foreach (explode(',', $string_order_by) as $order_by_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (! str_contains($order_by_segment, '.')) {
+                if (str($order_by_segment)->doesntContain('.')) {
                     $current = &$struct;
                     $parts = explode(':', $order_by_segment);
                     $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
@@ -359,7 +359,7 @@ abstract class CrudRepository
                 } else {
                     $current = &$struct['with'];
                     foreach (explode('..', $order_by_segment) as $relation_path) {
-                        if (str_contains($relation_path, '.')) {
+                        if (str($relation_path)->contains('.')) {
                             $parts = explode(':', $relation_path);
                             $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
                             [$key, $order_by] = explode('.', $parts[0], 2);
@@ -386,13 +386,13 @@ abstract class CrudRepository
             // process $string_select
             foreach (explode(',', $string_select) as $select_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (! str_contains($select_segment, '.')) {
+                if (str($select_segment)->doesntContain('.')) {
                     $current = &$struct;
                     $current['select'] = explode('|', $select_segment);
                 } else {
                     $current = &$struct['with'];
                     foreach (explode('..', $select_segment) as $relation_path) {
-                        if (str_contains($relation_path, '.')) {
+                        if (str($relation_path)->contains('.')) {
                             [$key, $select] = explode('.', $relation_path, 2);
                             if (! array_key_exists($key, $current)) {
                                 throw new Exception("You can't select field that are not in the relation.");
