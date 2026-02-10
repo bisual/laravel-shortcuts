@@ -17,7 +17,6 @@ use Illuminate\Support\Collection;
 
 abstract class CrudRepository
 {
-    /** @var class-string<Model> */
     public static string $model = Model::class;
 
     /*+

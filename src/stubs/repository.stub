@@ -9,6 +9,5 @@ use PlaceholderNamespacedModel;
 
 class PlaceholderClass extends CrudRepository
 {
-    /** @var class-string<PlaceholderModel> */
     public static string $model = PlaceholderModel::class;
 }
