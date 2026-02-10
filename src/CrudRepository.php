@@ -86,7 +86,7 @@ abstract class CrudRepository
                             $relations = implode('-', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
                             $table = (new static::$model)->{$relations}()->getRelated()->getTable();
-                            $clause->whereHas($relations, function (Builder $q) use ($attribute, $val, $table): void {
+                            $clause->whereHas($relations, function (mixed $q) use ($attribute, $val, $table): void {
                                 if ($val === null || $val === 'null') {
                                     $q->whereNull($table.'.'.$attribute);
                                 } elseif ($val === 'notnull') {
@@ -140,16 +140,16 @@ abstract class CrudRepository
 
             // Process Searchable Fields
             if ($search) {
-                $clause->where(function (Builder $query) use ($searchable_fields, $search): void {
+                $clause->where(function (mixed $query) use ($searchable_fields, $search): void {
                     foreach ($searchable_fields as $idx => $search_field) {
                         $parts = explode('.', $search_field);
                         if (count($parts) === 2) {
                             if ($idx === 0) {
-                                $query->whereHas($parts[0], function (Builder $query) use ($parts, $search): void {
+                                $query->whereHas($parts[0], function (mixed $query) use ($parts, $search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             } else {
-                                $query->orWhereHas($parts[0], function (Builder $query) use ($parts, $search): void {
+                                $query->orWhereHas($parts[0], function (mixed $query) use ($parts, $search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             }
@@ -163,13 +163,15 @@ abstract class CrudRepository
             }
 
             $records = $clause
-                ->when($paginate, function (Builder $query) use ($perPage, $page): LengthAwarePaginator {
+                ->when($paginate, function (mixed $query) use ($perPage, $page): LengthAwarePaginator {
                     return $query->paginate($perPage, ['*'], 'page', $page);
                 })
-                ->when($limit, function (Builder $query) use ($limit): Builder {
+                ->when(! $paginate && $limit, function (mixed $query) use ($limit): mixed {
                     return $query->limit($limit);
                 })
-                ->get();
+                ->when(! $paginate && ! $limit, function (mixed $query): mixed {
+                    return $query->get();
+                });
 
             if ($append !== null) {
                 foreach ($records as $record) {
@@ -254,10 +256,10 @@ abstract class CrudRepository
         return $record;
     }
 
-    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): Builder
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): mixed
     {
         $query = (static::$model)::query()
-            ->when($withoutGlobalScopes, function (Builder $q): Builder {
+            ->when($withoutGlobalScopes, function (mixed $q): mixed {
                 return $q->withoutGlobalScopes();
             });
 
@@ -289,13 +291,13 @@ abstract class CrudRepository
         return $query;
     }
 
-    private static function handleWithOrderByAndSelect(Builder &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null): void
+    private static function handleWithOrderByAndSelect(mixed &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null): void
     {
         $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive
         self::processParamsStructure($clause, $struct);
     }
 
-    private static function processParamsStructure(Builder &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    private static function processParamsStructure(mixed &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
         if (! empty($struct['select'])) {
@@ -315,7 +317,7 @@ abstract class CrudRepository
         }
 
         foreach ($struct['with'] as $relation => $config) {
-            $clause->with($relation, function (Builder $query) use ($relation, $config, $clause): void {
+            $clause->with($relation, function (mixed $query) use ($relation, $config, $clause): void {
                 $parent_model = $clause->getModel(); // get the parent model
                 self::processParamsStructure($query, $config, $parent_model, $relation);
             });
