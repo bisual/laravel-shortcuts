@@ -9,19 +9,20 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Validator;
-use InvalidArgumentException;
 
 abstract class CrudController extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
-    public static $repository = CrudRepository::class;
+    public static string $repository = CrudRepository::class;
 
-    public static $model = Model::class;
+    public static string $model = Model::class;
 
     public static array $authorize = [
         'index' => true,
@@ -33,11 +34,11 @@ abstract class CrudController extends BaseController
 
     public static array $indexQueryValidations = [];
 
-    public static $storeRequestClass = Request::class; // pot ser un array de validacions també
+    public static array|string|FormRequest $storeRequestClass = Request::class; // pot ser un array de validacions també
 
-    public static $updateRequestClass = Request::class; // pot ser un array de validacions també
+    public static array|string|FormRequest $updateRequestClass = Request::class; // pot ser un array de validacions també
 
-    public function index(Request $request, $functionExtraParametersTreatment = null)
+    public function index(Request $request, ?callable $callback = null): AnonymousResourceCollection
     {
         if (static::$authorize['index']) {
             $this->authorize('viewAny', [static::$model, $request->query()]);
@@ -49,28 +50,29 @@ abstract class CrudController extends BaseController
             $params = $request->query();
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($params);
+        if (is_callable($callback)) {
+            $callback($params);
         }
 
-        return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
+        return JsonResource::collection((static::$repository)::index($params, paginate: array_key_exists('page', $params)));
     }
 
-    public function show(Request $request, $id)
+    public function show(Request $request, int|string $id): JsonResponse
     {
-        $item = static::$repository::show($id, $request->query());
+        $record = static::$repository::show($id, $request->query());
+
         if (static::$authorize['show']) {
-            $this->authorize('view', $item);
+            $this->authorize('view', $record);
         }
 
-        return response()->json($item);
+        return response()->json($record);
     }
 
-    public function store(Request $request, $functionExtraParametersTreatment = null)
+    public function store(Request $request, ?callable $callback = null): JsonResponse
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
-        } elseif (static::$storeRequestClass !== Request::class) {
+        } elseif (is_subclass_of(static::$storeRequestClass, FormRequest::class)) {
             $data = $this->handleFormRequestValidation($request, static::$storeRequestClass);
         } else {
             $data = $request->all();
@@ -80,56 +82,53 @@ abstract class CrudController extends BaseController
             $this->authorize('create', [static::$model, $data]);
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($data);
+        if (is_callable($callback)) {
+            $callback($data);
         }
 
         return response()->json((static::$repository)::store($data));
     }
 
-    public function update(Request $request, $id, $functionExtraParametersTreatment = null)
+    public function update(Request $request, int|string $id, ?callable $callback = null): JsonResponse
     {
-        $item = (static::$repository)::show($id);
+        $record = (static::$repository)::show($id);
 
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
-        } elseif (static::$updateRequestClass !== Request::class) {
+        } elseif (is_subclass_of(static::$updateRequestClass, FormRequest::class)) {
             $data = $this->handleFormRequestValidation($request, static::$updateRequestClass);
         } else {
             $data = $request->all();
         }
 
         if (static::$authorize['update']) {
-            $this->authorize('update', [$item, $data]);
+            $this->authorize('update', [$record, $data]);
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($item, $data);
+        if (is_callable($callback)) {
+            $callback($record, $data);
         }
 
-        return response()->json((static::$repository)::update($item, $data));
+        return response()->json((static::$repository)::update($record, $data));
     }
 
-    public function destroy(Request $request, $id, $functionExtraParametersTreatment = null)
+    public function destroy(int|string|Model $id, ?callable $callback = null): JsonResponse
     {
-        $item = (static::$repository)::show($id);
+        $record = (static::$repository)::show($id);
+
         if (static::$authorize['destroy']) {
-            $this->authorize('delete', $item);
+            $this->authorize('delete', $record);
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($item);
+        if (is_callable($callback)) {
+            $callback($record);
         }
 
-        return response()->json((static::$repository)::destroy($item));
+        return response()->json((static::$repository)::destroy($record));
     }
 
     private function handleFormRequestValidation(Request $request, string $requestClass): array
     {
-        if (! is_subclass_of($requestClass, FormRequest::class)) {
-            throw new InvalidArgumentException("Class {$requestClass} must be an instance of ".FormRequest::class);
-        }
-
         /** @var FormRequest $formRequest */
         $formRequest = app($requestClass);
         $formRequest->merge($request->all());

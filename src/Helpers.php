@@ -1,29 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
-class Helper
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Stringable;
+
+final class Helper
 {
-    public static function replaceTextVariablesByRegex(string $template, string $pattern, string $model)
+    public static function replaceTextVariablesByRegexUsingStr(string|Stringable $template, string $pattern, string $repository): string|Stringable
     {
-        preg_match_all($pattern, $template, $values);
-        $variables_to_replace = $values[1];
+        return str($template)
+            ->replaceMatches($pattern, replace: function (array $matches) use ($repository): string {
+                $variable = $matches[1];
 
-        return preg_replace_callback($pattern, function ($matches) use ($variables_to_replace, $model) {
-            $variable = $matches[1];
-            if (in_array($variable, $variables_to_replace)) {
                 try {
-                    $s = $model::show($variable)->value;
-                } catch (\Exception $e) {
-                    $s = '';
+                    return $repository::show($variable)->value;
+                } catch (ModelNotFoundException) {
+                    return '';
                 }
-
-                return $s;
-            }
-
-            return $matches[0];
-        }, $template);
-
-        return $template;
+            })
+            ->when(is_string($template), fn (Stringable $str): string => $str->toString());
     }
 }

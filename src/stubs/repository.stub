@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PlaceholderNamespace;
+
+use Bisual\LaravelShortcuts\CrudRepository;
+use PlaceholderNamespacedModel;
+
+class PlaceholderClass extends CrudRepository
+{
+    public static string $model = PlaceholderModel::class;
+}

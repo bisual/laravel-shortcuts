@@ -1,0 +1,57 @@
+name: Rector
+
+on:
+  pull_request:
+    branches: [develop, main, sprint_*]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  workflow_dispatch:
+
+jobs:
+  rector:
+    name: Code Refactor Check
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Get changed PHP files
+        id: files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.event.pull_request.base.ref }}"
+          else
+            BASE="origin/main"
+          fi
+
+          git fetch origin
+
+          CHANGED=$(git diff --name-only $BASE...HEAD -- '*.php' | grep -E '^(src|config|database|tests)/.*\.php$' || true)
+          VALID_FILES=""
+          for file in $CHANGED; do
+            if [[ -f "$file" ]]; then
+              VALID_FILES="$VALID_FILES $file"
+            fi
+          done
+          echo "CHANGED_FILES=$VALID_FILES" >> $GITHUB_ENV
+
+      - name: Run Rector (dry-run) on changed files
+        if: env.CHANGED_FILES != ''
+        run: vendor/bin/rector process $CHANGED_FILES --dry-run
