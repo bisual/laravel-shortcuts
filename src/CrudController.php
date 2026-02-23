@@ -30,7 +30,7 @@ abstract class CrudController extends BaseController
         'destroy' => true,
     ];
 
-    public static array|string|FormRequest $indexQueryValidations = [];
+    public static array|string $indexQueryValidations = [];
 
     public static $storeRequestClass = Request::class; // pot ser un array de validacions també
 
