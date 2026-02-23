@@ -13,7 +13,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Validator;
-use InvalidArgumentException;
 
 abstract class CrudController extends BaseController
 {
@@ -31,7 +30,7 @@ abstract class CrudController extends BaseController
         'destroy' => true,
     ];
 
-    public static array $indexQueryValidations = [];
+    public static array|string|FormRequest $indexQueryValidations = [];
 
     public static $storeRequestClass = Request::class; // pot ser un array de validacions també
 
@@ -43,8 +42,10 @@ abstract class CrudController extends BaseController
             $this->authorize('viewAny', [static::$model, $request->query()]);
         }
 
-        if (count(static::$indexQueryValidations) > 0) {
+        if (is_array(static::$indexQueryValidations) && count(static::$indexQueryValidations) > 0) {
             $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation(static::$indexQueryValidations))->validate();
+        } elseif (is_string(static::$indexQueryValidations) && is_subclass_of(static::$indexQueryValidations, FormRequest::class)) {
+            $params = $this->handleQueryFormRequestValidation();
         } else {
             $params = $request->query();
         }
@@ -70,8 +71,8 @@ abstract class CrudController extends BaseController
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
-        } elseif (static::$storeRequestClass !== Request::class) {
-            $data = $this->handleFormRequestValidation($request, static::$storeRequestClass);
+        } elseif (is_string(static::$storeRequestClass) && is_subclass_of(static::$storeRequestClass, FormRequest::class)) {
+            $data = $this->handleFormRequestValidation();
         } else {
             $data = $request->all();
         }
@@ -93,8 +94,8 @@ abstract class CrudController extends BaseController
 
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
-        } elseif (static::$updateRequestClass !== Request::class) {
-            $data = $this->handleFormRequestValidation($request, static::$updateRequestClass);
+        } elseif (is_string(static::$updateRequestClass) && is_subclass_of(static::$updateRequestClass, FormRequest::class)) {
+            $data = $this->handleFormRequestValidation();
         } else {
             $data = $request->all();
         }
@@ -124,18 +125,23 @@ abstract class CrudController extends BaseController
         return response()->json((static::$repository)::destroy($item));
     }
 
-    private function handleFormRequestValidation(Request $request, string $requestClass): array
+    private function handleFormRequestValidation(): array
     {
-        if (! is_subclass_of($requestClass, FormRequest::class)) {
-            throw new InvalidArgumentException("Class {$requestClass} must be an instance of ".FormRequest::class);
-        }
+        $formRequest = app(static::$storeRequestClass);
 
-        /** @var FormRequest $formRequest */
-        $formRequest = app($requestClass);
-        $formRequest->merge($request->all());
+        return $this->validateWithFormRequest($formRequest, $formRequest->all());
+    }
 
-        $formRequest->setUserResolver($request->getUserResolver());
-        $formRequest->setRouteResolver($request->getRouteResolver());
+    private function handleQueryFormRequestValidation(): array
+    {
+        $formRequest = app(static::$indexQueryValidations);
+
+        return $this->validateWithFormRequest($formRequest, $formRequest->query());
+    }
+
+    private function validateWithFormRequest(FormRequest $formRequest, array $data): array
+    {
+        $formRequest->merge($data);
 
         $formRequest->validateResolved();
 
