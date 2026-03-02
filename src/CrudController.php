@@ -72,7 +72,7 @@ abstract class CrudController extends BaseController
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
         } elseif (is_string(static::$storeRequestClass) && is_subclass_of(static::$storeRequestClass, FormRequest::class)) {
-            $data = $this->handleFormRequestValidation();
+            $data = $this->handleStoreFormRequestValidation();
         } else {
             $data = $request->all();
         }
@@ -95,7 +95,7 @@ abstract class CrudController extends BaseController
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
         } elseif (is_string(static::$updateRequestClass) && is_subclass_of(static::$updateRequestClass, FormRequest::class)) {
-            $data = $this->handleFormRequestValidation();
+            $data = $this->handleUpdateFormRequestValidation();
         } else {
             $data = $request->all();
         }
@@ -125,9 +125,16 @@ abstract class CrudController extends BaseController
         return response()->json((static::$repository)::destroy($item));
     }
 
-    private function handleFormRequestValidation(): array
+    private function handleStoreFormRequestValidation(): array
     {
         $formRequest = app(static::$storeRequestClass);
+
+        return $this->validateWithFormRequest($formRequest, $formRequest->all());
+    }
+
+    private function handleUpdateFormRequestValidation(): array
+    {
+        $formRequest = app(static::$updateRequestClass);
 
         return $this->validateWithFormRequest($formRequest, $formRequest->all());
     }
