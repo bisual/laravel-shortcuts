@@ -481,17 +481,13 @@ abstract class CrudRepository
 
         $current_record = $record;
 
-        foreach ($relationship_names as $relation) {
-            if (! $current_record instanceof Model) {
-                return;
-            }
-
-            if (! $current_record->relationLoaded($relation)) {
-                throw new Exception("Relation '{$relation}' not loaded in model ".$record::class." when appending attribute '{$append}'. Load it using the 'with' parameter.");
+        foreach ($relationship_names as $relationship_name) {
+            if (! $current_record->relationLoaded($relationship_name)) {
+                throw new Exception("Relation '{$relationship_name}' not loaded in model ".$record::class." when appending attribute '{$append}'. Load it using the 'with' parameter.");
             }
 
             /** @var Model|null|Collection<int, Model> $current_record */
-            $current_record = $current_record->getRelation($relation);
+            $current_record = $current_record->getRelation($relationship_name);
         }
 
         if ($current_record instanceof Model) {
