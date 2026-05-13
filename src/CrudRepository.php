@@ -12,16 +12,19 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Stringable;
 
 abstract class CrudRepository
 {
     public static $model = Model::class;
 
-    /*+
+    /*
      * @params
      *      - with
      *      - without
+     *      - append
      *      - ... other attributes to filter
      */
     public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
@@ -170,9 +173,9 @@ abstract class CrudRepository
             }
 
             if ($append !== null) {
-                foreach ($data as $model) {
-                    foreach (explode(',', $append) as $append_item) {
-                        $model->append($append_item);
+                foreach ($data as $record) {
+                    foreach (str($append)->explode(',') as $append_item) {
+                        self::appendAttribute($record, str($append_item)->trim());
                     }
                 }
             }
@@ -458,5 +461,49 @@ abstract class CrudRepository
             $select_fields,
             $parent_model && $relation ? self::getForeignKeyData($parent_model, $relation) : []
         ));
+    }
+
+    private static function appendAttribute(Model $record, Stringable $append): void
+    {
+        $is_appending_main_model = $append->doesntContain('.');
+
+        if ($is_appending_main_model) {
+            $attributes = $append;
+
+            $record->append($attributes->toString());
+
+            return;
+        }
+
+        $relationship_names = $append->explode('.');
+
+        $relationship_attributes = $relationship_names->pop();
+
+        $current_record = $record;
+
+        foreach ($relationship_names as $relation) {
+            if (! $current_record instanceof Model) {
+                return;
+            }
+
+            if (! $current_record->relationLoaded($relation)) {
+                throw new Exception("Relation '{$relation}' not loaded in model ".$record::class." when appending attribute '{$append}'. Load it using the 'with' parameter.");
+            }
+
+            /** @var Model|null|Collection<int, Model> $current_record */
+            $current_record = $current_record->getRelation($relation);
+        }
+
+        if ($current_record instanceof Model) {
+            $current_record->append($relationship_attributes);
+
+            return;
+        }
+
+        if ($current_record instanceof Collection) {
+            $current_record->each(function (Model $related_model) use ($relationship_attributes): void {
+                $related_model->append($relationship_attributes);
+            });
+        }
     }
 }
