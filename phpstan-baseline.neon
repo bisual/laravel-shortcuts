@@ -1,0 +1,61 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Anonymous function has an unused use \$model_inst\.$#'
+			identifier: closure.unusedUse
+			count: 1
+			path: src/CrudRepository.php
+
+		-
+			message: '#^Call to function array_key_exists\(\) with string and array\{\} will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 4
+			path: src/CrudRepository.php
+
+		-
+			message: '#^Comparison operation "\>" between int\<1, max\> and 0 is always true\.$#'
+			identifier: greater.alwaysTrue
+			count: 1
+			path: src/CrudRepository.php
+
+		-
+			message: '#^Offset string on array\{\} in isset\(\) does not exist\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/CrudRepository.php
+
+		-
+			message: '#^PHPDoc tag @param has invalid value \(\[type\] \$clause\)\: Unexpected token "\[", expected type at offset 62 on line 4$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: src/CrudRepository.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/CrudRepository.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between mixed and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/CrudRepository.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 4
+			path: src/CrudRepository.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: src/Helpers.php
+
+		-
+			message: '#^Trait Bisual\\LaravelShortcuts\\Traits\\HasUuid is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: src/Traits/HasUuid.php

@@ -2,6 +2,19 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.3.0 - 2026-05-17
+
+### Added
+
+- Support for Laravel 13.
+
+### Changed
+
+- Updated CI matrix to test Laravel 10–13.
+- Migrated dev tooling to Larastan 3, Pest 4, and PHPUnit 12 for Laravel 13 compatibility.
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.2.0...v1.3.0
+
 ## v1.2.0 - 2026-05-13
 
 ### What's Changed
