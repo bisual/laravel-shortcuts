@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bisual\LaravelShortcuts;
 
+use BackedEnum;
 use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
 use Exception;
@@ -104,6 +105,8 @@ abstract class CrudRepository
                             $whereClause[] = [$attr, null]; // $q->whereNull($attribute);
                         } elseif ($val === 'notnull') {
                             $clause->whereNotNull($attr);
+                        } elseif ($val instanceof BackedEnum) {
+                            $clause->where($attr, $val);
                         } elseif (str_contains((string) $val, ',')) {
                             $clause->whereIn($attr, explode(',', $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
