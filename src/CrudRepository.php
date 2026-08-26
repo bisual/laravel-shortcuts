@@ -19,7 +19,11 @@ abstract class CrudRepository
 {
     public static $model = Model::class;
 
-    /*+
+    // -------------------------------------------------------------------------
+    // A. Public CRUD API
+    // -------------------------------------------------------------------------
+
+    /*
      * @params
      *      - with
      *      - without
@@ -133,10 +137,6 @@ abstract class CrudRepository
                 }
             }
 
-            // with=relation..relation2,user..relation1
-
-            // append=relation..relation2.append1
-            // select=relation..relation2.select_field
             // Process Without
             if ($without) {
                 foreach (explode(',', $without) as $w) {
@@ -262,9 +262,10 @@ abstract class CrudRepository
         return $model;
     }
 
-    /**
-     * Other private functions.
-     */
+    // -------------------------------------------------------------------------
+    // B. Query-params orchestration
+    // -------------------------------------------------------------------------
+
     protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
     {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
@@ -290,8 +291,26 @@ abstract class CrudRepository
         return $clause;
     }
 
+    private static function buildQueryFromParams(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, $where = null): void
+    {
+        $struct = self::getParamsStructure($with, $order_by, $select, $where); // we generate the structure with the data that we receive
+        self::processParamsStructure($clause, $struct);
+        if ($where) {
+            self::applyWhereConditionsToStructure($clause, $struct['where_conditions']);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // C. Parse query strings → structure
+    // -------------------------------------------------------------------------
+
     /**
-     * Create an array processing params.
+     * Build struct from with / order_by / select / where query strings.
+     *
+     * Format examples:
+     *   with=relation..relation2,user..relation1
+     *   append=relation..relation2.append1
+     *   select=relation..relation2.select_field
      */
     private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null): array
     {
@@ -413,7 +432,31 @@ abstract class CrudRepository
     }
 
     /**
-     * Split a segment by && (outside value delimiters) into condition arrays.
+     * Extract group-level ::parent|child|both default from a where segment.
+     */
+    private static function getFilterType(string &$where_segment): FilterType
+    {
+        $parts = StringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
+
+        if (count($parts) === 1) {
+            return FilterType::Parent;
+        }
+
+        $maybe_type = $parts[count($parts) - 1];
+        $valid = array_column(FilterType::cases(), 'value');
+
+        if (! in_array($maybe_type, $valid, true)) {
+            return FilterType::Parent;
+        }
+
+        array_pop($parts);
+        $where_segment = implode('::', $parts);
+
+        return FilterType::from($maybe_type);
+    }
+
+    /**
+     * Split a segment by && into condition arrays.
      * Each condition may override the default filter type with ::parent|child|both.
      *
      * @return array<int, array{key: string, operator: string, value: string, path: ?string, filter_type: FilterType}>
@@ -456,31 +499,7 @@ abstract class CrudRepository
     }
 
     /**
-     * Extract the filter type to apply on a where segment (group-level default).
-     */
-    private static function getFilterType(string &$where_segment): FilterType
-    {
-        $parts = StringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
-
-        if (count($parts) === 1) {
-            return FilterType::Parent;
-        }
-
-        $maybe_type = $parts[count($parts) - 1];
-        $valid = array_column(FilterType::cases(), 'value');
-
-        if (! in_array($maybe_type, $valid, true)) {
-            return FilterType::Parent;
-        }
-
-        array_pop($parts);
-        $where_segment = implode('::', $parts);
-
-        return FilterType::from($maybe_type);
-    }
-
-    /**
-     * Transforms multiple values from string to array
+     * Transform multiple values from string to array (separator |).
      */
     private static function parseMultipleValues(string $raw_value, string $separator = '|'): array
     {
@@ -490,17 +509,12 @@ abstract class CrudRepository
         );
     }
 
-    private static function buildQueryFromParams(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, $where = null): void
-    {
-        $struct = self::getParamsStructure($with, $order_by, $select, $where); // we generate the structure with the data that we receive
-        self::processParamsStructure($clause, $struct);
-        if ($where) {
-            self::applyWhereConditionsToStructure($clause, $struct['where_conditions']);
-        }
-    }
+    // -------------------------------------------------------------------------
+    // D. Apply with / select / order_by
+    // -------------------------------------------------------------------------
 
     /**
-     * Process the params structure.
+     * Apply select, order_by and nested with from the params structure.
      */
     private static function processParamsStructure(mixed &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
@@ -530,6 +544,10 @@ abstract class CrudRepository
         }
     }
 
+    // -------------------------------------------------------------------------
+    // E. Apply where conditions
+    // -------------------------------------------------------------------------
+
     private static function applyWhereConditionsToStructure(mixed &$clause, array $where_conditions): void
     {
         foreach ($where_conditions as $condition_group) {
@@ -556,7 +574,7 @@ abstract class CrudRepository
     /**
      * Process simple condition ['key', 'operator', 'value', 'path'].
      *
-     * @param  mixed  $eager_load_query  Query raíz donde fusionar constraints de eager load (Child/Both).
+     * @param  mixed  $eager_load_query  Root query for Child/Both eager-load merge.
      */
     private static function processSimpleCondition(&$query, array $condition, FilterType $filter_type, mixed &$eager_load_query = null): void
     {
@@ -638,7 +656,7 @@ abstract class CrudRepository
     }
 
     /**
-     * Process diferent operators and build respective query
+     * Map operator + value to the corresponding Eloquent where*.
      */
     private static function processConditionOperator(&$query, array $condition)
     {
@@ -710,6 +728,10 @@ abstract class CrudRepository
         }
     }
 
+    // -------------------------------------------------------------------------
+    // F. Result post-processing
+    // -------------------------------------------------------------------------
+
     private static function appendAttribute(Model $record, Stringable $append): void
     {
         $is_appending_main_model = $append->doesntContain('.');
@@ -747,4 +769,5 @@ abstract class CrudRepository
             });
         }
     }
+
 }

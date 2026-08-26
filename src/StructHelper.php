@@ -14,8 +14,12 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 
 final class StructHelper
 {
+    // -------------------------------------------------------------------------
+    // Select / foreign keys (eager-load selects)
+    // -------------------------------------------------------------------------
+
     /**
-     * Build the select required fomat and fields.
+     * Build the select required format and fields.
      */
     public static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
     {
@@ -24,95 +28,6 @@ final class StructHelper
             $select_fields,
             $parent_model && $relation ? self::getForeignKeyData($parent_model, $relation) : []
         ));
-    }
-
-    // Get simple condition and returns:
-    // [
-    //    'key' => 'users..profiles.role',
-    //    'operator' => '=',
-    //    'value' => '<{manager}>',
-    //    'path' => 'users..profiles'
-    // ]
-    public static function createConditionArray(string $condition): array
-    {
-        $path = self::extractRelationPathFromWhereSegment($condition);
-        $cond = self::buildWhereCondition($condition);
-        $cond['path'] = $path;
-
-        return $cond;
-    }
-
-    /**
-     * Return the relation path from where condition.
-     */
-    private static function extractRelationPathFromWhereSegment(string $where_segment): ?string // profile..users.code[=]<{900}>
-    {$key = self::extractFullKeyFromWhereSegment($where_segment); // profile..users.code
-
-        $last_dot = mb_strrpos($key, '.');
-
-        // we hare on the surface
-        if ($last_dot === false) {
-            return null;
-        }
-
-        $path = mb_substr($key, 0, $last_dot);
-
-        return $path; // profile..users
-    }
-
-    /**
-     * Build where condition skeleton.
-     */
-    private static function buildWhereCondition(string $segment): array
-    {
-        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $segment);
-        $close = $open === false ? false : StringDelimitersHelper::indexOfOutsideRanges(']', $segment, $open + 1);
-
-        if ($open === false || $close === false) {
-            throw new Exception("Invalid where condition format: '{$segment}'");
-        }
-
-        $key = mb_substr($segment, 0, $open);
-        $operator = mb_substr($segment, $open + 1, $close - $open - 1);
-        $value = mb_substr($segment, $close + 1);
-
-        if (mb_trim($key) === '') {
-            throw new Exception("Invalid where segment: missing key in '{$segment}'");
-        }
-
-        return [
-            'key' => self::getTargetColumnFromPath($key),
-            'operator' => $operator,
-            'value' => $value,
-        ];
-    }
-
-    /**
-     * Return the key from where condition.
-     */
-    private static function extractFullKeyFromWhereSegment(string $where_segment): string // profile..users.code[=]<{900}>
-    {
-        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $where_segment);
-        if ($open === false) {
-            throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
-        }
-
-        $key = mb_substr($where_segment, 0, $open);
-        if (mb_trim($key) === '') {
-            throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
-        }
-
-        return $key; // profile..users.code
-    }
-
-    /**
-     * Return the target column from path
-     */
-    private static function getTargetColumnFromPath(string $where_path): string // profile..details.code
-    {
-        $parts = explode('.', $where_path);
-
-        return array_pop($parts); // code
     }
 
     /**
@@ -169,9 +84,104 @@ final class StructHelper
         return [];
     }
 
+    // -------------------------------------------------------------------------
+    // Where condition parsing (string → key / operator / value / path)
+    // -------------------------------------------------------------------------
+
+    // Get simple condition and returns:
+    // [
+    //    'key' => 'users..profiles.role',
+    //    'operator' => '=',
+    //    'value' => '<{manager}>',
+    //    'path' => 'users..profiles'
+    // ]
+    public static function createConditionArray(string $condition): array
+    {
+        $path = self::extractRelationPathFromWhereSegment($condition);
+        $cond = self::buildWhereCondition($condition);
+        $cond['path'] = $path;
+
+        return $cond;
+    }
+
     /**
-     * GRAVEYARD
+     * Return the relation path from where condition.
      */
+    private static function extractRelationPathFromWhereSegment(string $where_segment): ?string // profile..users.code[=]<{900}>
+    {
+        $key = self::extractFullKeyFromWhereSegment($where_segment); // profile..users.code
+
+        $last_dot = mb_strrpos($key, '.');
+
+        // we hare on the surface
+        if ($last_dot === false) {
+            return null;
+        }
+
+        $path = mb_substr($key, 0, $last_dot);
+
+        return $path; // profile..users
+    }
+
+    /**
+     * Return the key from where condition.
+     */
+    private static function extractFullKeyFromWhereSegment(string $where_segment): string // profile..users.code[=]<{900}>
+    {
+        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $where_segment);
+        if ($open === false) {
+            throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
+        }
+
+        $key = mb_substr($where_segment, 0, $open);
+        if (mb_trim($key) === '') {
+            throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
+        }
+
+        return $key; // profile..users.code
+    }
+
+    /**
+     * Build where condition skeleton.
+     */
+    private static function buildWhereCondition(string $segment): array
+    {
+        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $segment);
+        $close = $open === false ? false : StringDelimitersHelper::indexOfOutsideRanges(']', $segment, $open + 1);
+
+        if ($open === false || $close === false) {
+            throw new Exception("Invalid where condition format: '{$segment}'");
+        }
+
+        $key = mb_substr($segment, 0, $open);
+        $operator = mb_substr($segment, $open + 1, $close - $open - 1);
+        $value = mb_substr($segment, $close + 1);
+
+        if (mb_trim($key) === '') {
+            throw new Exception("Invalid where segment: missing key in '{$segment}'");
+        }
+
+        return [
+            'key' => self::getTargetColumnFromPath($key),
+            'operator' => $operator,
+            'value' => $value,
+        ];
+    }
+
+    /**
+     * Return the target column from path
+     */
+    private static function getTargetColumnFromPath(string $where_path): string // profile..details.code
+    {
+        $parts = explode('.', $where_path);
+
+        return array_pop($parts); // code
+    }
+
+    // -------------------------------------------------------------------------
+    // GRAVEYARD
+    // -------------------------------------------------------------------------
+
     /**
     * Put a condition block into the structure.
     */

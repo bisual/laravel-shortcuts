@@ -10,6 +10,10 @@ final class StringDelimitersHelper
 {
     private static array $delimiter_ranges = [];
 
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
     public static function getDelimiterRanges(): array
     {
         return self::$delimiter_ranges;
@@ -44,12 +48,34 @@ final class StringDelimitersHelper
         return false;
     }
 
-    /**
-     * ACCESSORS.
-     */
+    // -------------------------------------------------------------------------
+    // Internals
+    // -------------------------------------------------------------------------
+
     private static function setDelimiterRanges(string $input, string $start = '<{', string $end = '}>'): void
     {
         self::$delimiter_ranges = self::getCustomDelimiterRanges($input, $start, $end);
+    }
+
+    /**
+     * Get the position of the opening and closing delimiter ranges of string.
+     */
+    private static function getCustomDelimiterRanges(string $input, string $start, string $end): array
+    {
+        $ranges = [];
+        $offset = 0;
+
+        while (($start_pos = mb_strpos($input, $start, $offset)) !== false) {
+            $end_pos = mb_strpos($input, $end, $start_pos + mb_strlen($start));
+            if ($end_pos === false) {
+                throw new Exception("Missing closing delimiter '{$end}' on column {$start_pos} of {$input}");
+            }
+
+            $ranges[] = [$start_pos, $end_pos + mb_strlen($end)]; // save $start_pos and $end_pos finded
+            $offset = $end_pos + mb_strlen($end);
+        }
+
+        return $ranges;
     }
 
     /**
@@ -94,26 +120,5 @@ final class StringDelimitersHelper
         }
 
         return false;
-    }
-
-    /**
-     * Get the position of the opening and closing dilimiter ranges of string.
-     */
-    private static function getCustomDelimiterRanges(string $input, string $start, string $end): array
-    {
-        $ranges = [];
-        $offset = 0;
-
-        while (($start_pos = mb_strpos($input, $start, $offset)) !== false) {
-            $end_pos = mb_strpos($input, $end, $start_pos + mb_strlen($start));
-            if ($end_pos === false) {
-                throw new Exception("Missing closing delimiter '{$end}' on column {$start_pos} of {$input}");
-            }
-
-            $ranges[] = [$start_pos, $end_pos + mb_strlen($end)]; // save $start_pos and $end_pos finded
-            $offset = $end_pos + mb_strlen($end);
-        }
-
-        return $ranges;
     }
 }
