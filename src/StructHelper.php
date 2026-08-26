@@ -46,7 +46,8 @@ final class StructHelper
      * Return the relation path from where condition.
      */
     private static function extractRelationPathFromWhereSegment(string $where_segment): ?string // profile..users.code[=]<{900}>
-    {$key = self::extractFullKeyFromWhereSegment($where_segment); // profile..users.code
+    {
+        $key = self::extractFullKeyFromWhereSegment($where_segment); // profile..users.code
 
         $last_dot = mb_strrpos($key, '.');
 
