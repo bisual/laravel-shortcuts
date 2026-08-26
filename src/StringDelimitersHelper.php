@@ -6,17 +6,9 @@ namespace Bisual\LaravelShortcuts;
 
 use Exception;
 
-class StringDelimitersHelper
+final class StringDelimitersHelper
 {
     private static array $delimiter_ranges = [];
-
-    /**
-     * ACCESSORS.
-     */
-    private static function setDelimiterRanges(string $input, string $start = '<{', string $end = '}>'): void
-    {
-        self::$delimiter_ranges = self::getCustomDelimiterRanges($input, $start, $end);
-    }
 
     public static function getDelimiterRanges(): array
     {
@@ -34,24 +26,48 @@ class StringDelimitersHelper
     }
 
     /**
+     * Get the position of $needle in $input ignoring occurrences inside <{...}> delimiters.
+     */
+    public static function indexOfOutsideRanges(string $needle, string $input, int $offset = 0): int|false
+    {
+        self::setDelimiterRanges($input);
+
+        $needle_length = mb_strlen($needle);
+        $length = mb_strlen($input);
+
+        for ($i = $offset; $i < $length; $i++) {
+            if (mb_substr($input, $i, $needle_length) === $needle && ! self::isInsidePrecomputedRanges($i)) {
+                return $i;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * ACCESSORS.
+     */
+    private static function setDelimiterRanges(string $input, string $start = '<{', string $end = '}>'): void
+    {
+        self::$delimiter_ranges = self::getCustomDelimiterRanges($input, $start, $end);
+    }
+
+    /**
      * Explode by custom separator checking to not separate if $separator is inside precomputed ranges.
      */
     private static function smartExplode(string $separator, string $input): array
     {
-        if (empty(self::$delimiter_ranges)) {
-            throw new Exception('Delimiter ranges must be set before calling smartExplode');
-        }
-
+        // Ranges vacíos = no hay <{...}> en el string; igual se puede explotar con normalidad
         $segments = [];
         $buffer = '';
-        $separator_length = strlen($separator);
-        $length = strlen($input);
+        $separator_length = mb_strlen($separator);
+        $length = mb_strlen($input);
 
         for ($i = 0; $i < $length; $i++) {
             $char = $input[$i];
 
-            if (substr($input, $i, $separator_length) === $separator && ! self::isInsidePrecomputedRanges($i)) {
-                $segments[] = trim($buffer);
+            if (mb_substr($input, $i, $separator_length) === $separator && ! self::isInsidePrecomputedRanges($i)) {
+                $segments[] = mb_trim($buffer);
                 $buffer = '';
                 $i += $separator_length - 1;
             } else {
@@ -59,8 +75,8 @@ class StringDelimitersHelper
             }
         }
 
-        if (strlen($buffer)) {
-            $segments[] = trim($buffer);
+        if (mb_strlen($buffer)) {
+            $segments[] = mb_trim($buffer);
         }
 
         return $segments;
@@ -88,14 +104,14 @@ class StringDelimitersHelper
         $ranges = [];
         $offset = 0;
 
-        while (($start_pos = strpos($input, $start, $offset)) !== false) {
-            $end_pos = strpos($input, $end, $start_pos + strlen($start));
+        while (($start_pos = mb_strpos($input, $start, $offset)) !== false) {
+            $end_pos = mb_strpos($input, $end, $start_pos + mb_strlen($start));
             if ($end_pos === false) {
                 throw new Exception("Missing closing delimiter '{$end}' on column {$start_pos} of {$input}");
             }
 
-            $ranges[] = [$start_pos, $end_pos + strlen($end)]; // save $start_pos and $end_pos finded
-            $offset = $end_pos + strlen($end);
+            $ranges[] = [$start_pos, $end_pos + mb_strlen($end)]; // save $start_pos and $end_pos finded
+            $offset = $end_pos + mb_strlen($end);
         }
 
         return $ranges;

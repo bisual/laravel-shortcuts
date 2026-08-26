@@ -6,12 +6,13 @@ namespace Bisual\LaravelShortcuts;
 
 use Exception;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
-class StructHelper
+final class StructHelper
 {
     /**
      * Build the select required fomat and fields.
@@ -34,8 +35,8 @@ class StructHelper
     // ]
     public static function createConditionArray(string $condition): array
     {
-        $path = StructHelper::extractRelationPathFromWhereSegment($condition);
-        $cond = StructHelper::buildWhereCondition($condition);
+        $path = self::extractRelationPathFromWhereSegment($condition);
+        $cond = self::buildWhereCondition($condition);
         $cond['path'] = $path;
 
         return $cond;
@@ -47,14 +48,14 @@ class StructHelper
     private static function extractRelationPathFromWhereSegment(string $where_segment): ?string // profile..users.code[=]<{900}>
     {$key = self::extractFullKeyFromWhereSegment($where_segment); // profile..users.code
 
-        $last_dot = strrpos($key, '.');
+        $last_dot = mb_strrpos($key, '.');
 
         // we hare on the surface
         if ($last_dot === false) {
             return null;
         }
 
-        $path = substr($key, 0, $last_dot);
+        $path = mb_substr($key, 0, $last_dot);
 
         return $path; // profile..users
     }
@@ -64,11 +65,20 @@ class StructHelper
      */
     private static function buildWhereCondition(string $segment): array
     {
-        if (! str_contains($segment, '[') || ! str_contains($segment, ']')) { // TODO: controlar que no estén dentro de los delimiters
+        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $segment);
+        $close = $open === false ? false : StringDelimitersHelper::indexOfOutsideRanges(']', $segment, $open + 1);
+
+        if ($open === false || $close === false) {
             throw new Exception("Invalid where condition format: '{$segment}'");
         }
-        [$key, $rest] = explode('[', $segment, 2);
-        [$operator, $value] = explode(']', $rest, 2);
+
+        $key = mb_substr($segment, 0, $open);
+        $operator = mb_substr($segment, $open + 1, $close - $open - 1);
+        $value = mb_substr($segment, $close + 1);
+
+        if (mb_trim($key) === '') {
+            throw new Exception("Invalid where segment: missing key in '{$segment}'");
+        }
 
         return [
             'key' => self::getTargetColumnFromPath($key),
@@ -81,8 +91,14 @@ class StructHelper
      * Return the key from where condition.
      */
     private static function extractFullKeyFromWhereSegment(string $where_segment): string // profile..users.code[=]<{900}>
-    {[$key] = explode('[', $where_segment, 2);
-        if (! isset($key) || trim($key) === '') {
+    {
+        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $where_segment);
+        if ($open === false) {
+            throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
+        }
+
+        $key = mb_substr($where_segment, 0, $open);
+        if (mb_trim($key) === '') {
             throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
         }
 
@@ -93,7 +109,8 @@ class StructHelper
      * Return the target column from path
      */
     private static function getTargetColumnFromPath(string $where_path): string // profile..details.code
-    {$parts = explode('.', $where_path);
+    {
+        $parts = explode('.', $where_path);
 
         return array_pop($parts); // code
     }
@@ -113,18 +130,40 @@ class StructHelper
             throw new Exception("Relation '{$relation}' not found in model ".$model::class);
         }
 
-        if ($relation_instance instanceof MorphTo
-            || $relation_instance instanceof MorphOne
-            || $relation_instance instanceof MorphMany
-        ) {
+        if ($relation_instance instanceof MorphTo) {
+            $table = $model->getTable();
+
             return [
-                $relation_instance->getForeignKeyName(),
-                $relation_instance->getMorphType(),
+                $table.'.'.$relation_instance->getForeignKeyName(),
+                $table.'.'.$relation_instance->getMorphType(),
             ];
         }
 
+        if ($relation_instance instanceof MorphOne
+            || $relation_instance instanceof MorphMany
+        ) {
+            $table = $relation_instance->getRelated()->getTable();
+
+            return [
+                $table.'.'.$relation_instance->getForeignKeyName(),
+                $table.'.'.$relation_instance->getMorphType(),
+            ];
+        }
+
+        if ($relation_instance instanceof BelongsTo) {
+            $table = $relation_instance->getRelated()->getTable();
+
+            return [$table.'.'.$relation_instance->getOwnerKeyName()];
+        }
+
+        if (method_exists($relation_instance, 'getQualifiedForeignKeyName')) {
+            return [$relation_instance->getQualifiedForeignKeyName()];
+        }
+
         if (method_exists($relation_instance, 'getForeignKeyName')) {
-            return [$relation_instance->getForeignKeyName()]; // TODO: falta añadir el nombre de la tabla delante!!!
+            $table = $relation_instance->getRelated()->getTable();
+
+            return [$table.'.'.$relation_instance->getForeignKeyName()];
         }
 
         return [];

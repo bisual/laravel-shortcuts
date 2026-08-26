@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Bisual\LaravelShortcuts;
 
+use BackedEnum;
 use Bisual\LaravelShortcuts\Enums\FilterType;
 use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Stringable;
 
 abstract class CrudRepository
 {
@@ -20,6 +22,7 @@ abstract class CrudRepository
      * @params
      *      - with
      *      - without
+     *      - append
      *      - ... other attributes to filter
      */
     public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
@@ -39,7 +42,7 @@ abstract class CrudRepository
             // query params on deepest with
             $clause = self::getClause($params);
 
-            $searchable_fields = (new static::$model)->searchable;
+            $searchable_fields = (new static::$model())->searchable;
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
                 $search = $params['search'];
@@ -99,6 +102,8 @@ abstract class CrudRepository
                             $whereClause[] = [$attr, null]; // $q->whereNull($attribute);
                         } elseif ($val === 'notnull') {
                             $clause->whereNotNull($attr);
+                        } elseif ($val instanceof BackedEnum) {
+                            $clause->where($attr, $val);
                         } elseif (str_contains((string) $val, ',')) {
                             $clause->whereIn($attr, explode(',', $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
@@ -142,7 +147,18 @@ abstract class CrudRepository
             if ($search) {
                 $clause->where(function ($query) use (&$searchable_fields, &$search): void {
                     foreach ($searchable_fields as $idx => $search_field) {
-                        if ($idx === 0) {
+                        $parts = explode('.', $search_field);
+                        if (count($parts) === 2) {
+                            if ($idx === 0) {
+                                $query->whereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                    $query->where($parts[1], 'like', "%{$search}%");
+                                });
+                            } else {
+                                $query->orWhereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                    $query->where($parts[1], 'like', "%{$search}%");
+                                });
+                            }
+                        } elseif ($idx === 0) {
                             $query->where($search_field, 'like', "%{$search}%");
                         } else {
                             $query->orWhere($search_field, 'like', "%{$search}%");
@@ -161,15 +177,16 @@ abstract class CrudRepository
             }
 
             if ($append !== null) {
-                foreach ($data as $model) {
-                    foreach (explode(',', $append) as $append_item) {
-                        $model->append($append_item);
+                foreach ($data as $record) {
+                    foreach (str($append)->explode(',') as $append_item) {
+                        self::appendAttribute($record, str($append_item)->trim());
                     }
                 }
             }
 
             return $data;
-        } elseif ($functionExtraParametersTreatment !== null) {
+        }
+        if ($functionExtraParametersTreatment !== null) {
             $clause = (static::$model)::query();
             if ($functionExtraParametersTreatment !== null) {
                 $functionExtraParametersTreatment($clause, $params);
@@ -193,7 +210,7 @@ abstract class CrudRepository
         if ($id instanceof static::$model) {
             return $id;
         } // ja li hem passat el model
-        elseif (is_object($id)) {
+        if (is_object($id)) {
             $id = $id->id;
         } // per si li hem passat algun altre objecte
         elseif (is_array($id)) {
@@ -245,62 +262,9 @@ abstract class CrudRepository
     }
 
     /**
-     * Other private functions.
-     */
-    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
-    {
-        $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
-
-        // With
-        $with = null;
-        if (isset($params['with'])) {
-            $with = $params['with'];
-            unset($params['with']);
-        }
-
-        // Order by
-        $order_by = null;
-        if (isset($params['order_by'])) {
-            $order_by = $params['order_by'];
-            unset($params['order_by']);
-        }
-
-        // Select
-        $select = null;
-        if (isset($params['select'])) {
-            $select = $params['select'];
-            unset($params['select']);
-        }
-
-        // Where
-        $where = null;
-        if (isset($params['where'])) {
-            $where = $params['where'];
-            unset($params['where']);
-        }
-
-        if ($with || $order_by || $select || $where) { // TODO: cambiar esto a array
-            self::buildQueryFromParams($clause, $with, $order_by, $select, $where);
-        }
-
-        return $clause;
-    }
-
-    private static function buildQueryFromParams(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, $where = null): void
-    {
-        $struct = self::getParamsStructure($with, $order_by, $select, $where); // we generate the structure with the data that we receive
-        self::processParamsStructure($clause, $struct);
-        if ($where) {
-            self::applyWhereConditionsToStructure($clause, $struct['where_conditions']);
-        }
-    }
-
-    /**
      * Create an array processing params.
      */
-
-    // PONER PRIVATE
-    public static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null): array
+    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null): array
     {
         $struct = [];
 
@@ -385,76 +349,152 @@ abstract class CrudRepository
         }
 
         if ($string_where) {
-            foreach (StringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) { // separamos condiciones separadas por ',' en ppio estas son diferemtes where() encadenados regentados por el path
-                $filter_type = self::getFilterType($where_segment); // first, clean the segment
+            foreach (StringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) {
+                // Default del bloque (sufijo ::parent|child|both al final del segmento)
+                $default_filter_type = self::getFilterType($where_segment);
 
-                $or_conditions = StringDelimitersHelper::explodeOutsideRanges('||', $where_segment); // explotamos por || buscando condiciones OR
+                $or_conditions = StringDelimitersHelper::explodeOutsideRanges('||', $where_segment);
+
                 if (count($or_conditions) > 1) {
                     $condition_group = [
                         'or_group' => true,
-                        'filter_type' => $filter_type,
                         'groups' => [],
                     ];
 
-                    foreach ($or_conditions as $or_condition) { // para cada condición OR
-                        $and_conditions = StringDelimitersHelper::explodeOutsideRanges('&&', $or_condition); // explotamos por && en busca de condiciones AND, si las encontramos deberemos unirlas
-
-                        $and_group = []; // * Definimos el grupo AND para ir llenándolo dentro del foreach con los diferentes segmentos AND encontrados
-                        foreach ($and_conditions as $condition) {
-                            $and_group[] = StructHelper::createConditionArray($condition); // habiéndo llegado a la condición simple, transformamos el string en un pequeño array con clave: key, operator, value, path
-                        }
-
+                    foreach ($or_conditions as $or_condition) {
                         $condition_group['groups'][] = [
-                            'conditions' => $and_group,
+                            'conditions' => self::parseAndConditions($or_condition, $default_filter_type),
                         ];
                     }
 
-                    $struct['where_conditions'][] = $condition_group; // una vez hemos procesado todo el bloque encontrado entre coma y coma, añadimos el grupo de condiciones al $struct general
+                    $struct['where_conditions'][] = $condition_group;
                 } else {
-                    $struct['where_conditions'][] = [
-                        'filter_type' => $filter_type,
-                        'condition' => StructHelper::createConditionArray($where_segment),
-                    ];
+                    foreach (self::parseAndConditions($where_segment, $default_filter_type) as $condition) {
+                        $struct['where_conditions'][] = [
+                            'filter_type' => $condition['filter_type'],
+                            'condition' => $condition,
+                        ];
+                    }
                 }
             }
-            // foreach(StringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) {
-            //     // si el filter_type es parent o both, extraigo el relation path
-            //     $filter_type = self::getFilterType($where_segment); // first, clean the segment
-            //     $full_relation_path = null;
-            //     if ($filter_type->isParentOrBoth()) {
-            //         $full_relation_path = StructHelper::extractRelationPathFromWhereSegment($where_segment);
-            //     }
-
-            //     foreach(StringDelimitersHelper::explodeOutsideRanges('..', $where_segment) as $relation_path) {
-            //         //tengo que mirar si $relation_path contiene . para saber si tengo que procesar la condición
-            //         $parts = StringDelimitersHelper::explodeOutsideRanges('.', $relation_path); // lo hacemos de esta manera porqué no nos interesa tener en cuenta puntos que se encuentren dentro de los delimitadores
-            //         if (count($parts) > 1) {
-            //             // estoy en el nivel de la relación adecuado
-            //         } else {
-            //             // estoy en un simple string
-            //     }
-            //         }
-            //     // aquí tengo que incluir las condiciones en el struct
-            // }
-
         }
 
         return $struct;
     }
 
-    // Extract de filter type to apply on condition
-    public static function getFilterType(string &$where_segment): FilterType
+    /**
+     * Split a segment by && (outside value delimiters) into condition arrays.
+     * Each condition may override the default filter type with ::parent|child|both.
+     *
+     * @return array<int, array{key: string, operator: string, value: string, path: ?string, filter_type: FilterType}>
+     */
+    private static function parseAndConditions(string $segment, FilterType $default_filter_type = FilterType::Parent): array
+    {
+        $parts = StringDelimitersHelper::explodeOutsideRanges('&&', $segment);
+
+        return array_map(function (string $condition) use ($default_filter_type): array {
+            $filter_type = self::extractConditionFilterType($condition, $default_filter_type);
+            $parsed = StructHelper::createConditionArray($condition);
+            $parsed['filter_type'] = $filter_type;
+
+            return $parsed;
+        }, $parts);
+    }
+
+    /**
+     * Extract optional ::filterType from a single condition, falling back to default.
+     */
+    private static function extractConditionFilterType(string &$condition, FilterType $default): FilterType
+    {
+        $parts = StringDelimitersHelper::explodeOutsideRanges('::', $condition);
+
+        if (count($parts) === 1) {
+            return $default;
+        }
+
+        $maybe_type = $parts[count($parts) - 1];
+        $valid = array_column(FilterType::cases(), 'value');
+
+        if (! in_array($maybe_type, $valid, true)) {
+            return $default;
+        }
+
+        array_pop($parts);
+        $condition = implode('::', $parts);
+
+        return FilterType::from($maybe_type);
+    }
+
+    /**
+     * Extract the filter type to apply on a where segment (group-level default).
+     */
+    private static function getFilterType(string &$where_segment): FilterType
     {
         $parts = StringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
 
         if (count($parts) === 1) {
-            return FilterType::Parent; // por defecto padre mejor
+            return FilterType::Parent;
         }
 
-        $filter_type = array_pop($parts);
+        $maybe_type = $parts[count($parts) - 1];
+        $valid = array_column(FilterType::cases(), 'value');
+
+        if (! in_array($maybe_type, $valid, true)) {
+            return FilterType::Parent;
+        }
+
+        array_pop($parts);
         $where_segment = implode('::', $parts);
 
-        return FilterType::from($filter_type);
+        return FilterType::from($maybe_type);
+    }
+
+    /**
+     * Transforms multiple values from string to array
+     */
+    private static function parseMultipleValues(string $raw_value, string $separator = '|'): array
+    {
+        return array_filter(
+            array_map('trim', explode($separator, $raw_value)),
+            fn ($v) => $v !== ''
+        );
+    }
+
+    /**
+     * Other private functions.
+     */
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
+    {
+        $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
+
+        $query_params = [];
+        foreach (['with', 'order_by', 'select', 'where'] as $key) {
+            if (isset($params[$key])) {
+                $query_params[$key] = $params[$key];
+                unset($params[$key]);
+            }
+        }
+
+        if ($query_params !== []) {
+            self::buildQueryFromParams(
+                $clause,
+                $query_params['with'] ?? null,
+                $query_params['order_by'] ?? null,
+                $query_params['select'] ?? null,
+                $query_params['where'] ?? null,
+            );
+        }
+
+        return $clause;
+    }
+
+    private static function buildQueryFromParams(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, $where = null): void
+    {
+        $struct = self::getParamsStructure($with, $order_by, $select, $where); // we generate the structure with the data that we receive
+        self::processParamsStructure($clause, $struct);
+        if ($where) {
+            self::applyWhereConditionsToStructure($clause, $struct['where_conditions']);
+        }
     }
 
     /**
@@ -491,33 +531,34 @@ abstract class CrudRepository
     private static function applyWhereConditionsToStructure(mixed &$clause, array $where_conditions): void
     {
         foreach ($where_conditions as $condition_group) {
-            $filter_type = $condition_group['filter_type']; // guardamos el filter_type de la condición
-
             if (! empty($condition_group['or_group'])) {
-                // estamos en una condición OR
-                $clause->where(function ($q) use ($condition_group, $filter_type) {
-
-                    foreach ($condition_group['groups'] as $and_group) { // iteramos sobre los grupos or
-                        $q->orWhere(function ($sub_q) use ($and_group, $filter_type) {
-
-                            foreach ($and_group['conditions'] as $condition) { // iteramos sobre cada condición and
-                                self::processSimpleCondition($sub_q, $condition, $filter_type); // tene
+                $clause->where(function ($q) use ($condition_group, &$clause): void {
+                    foreach ($condition_group['groups'] as $and_group) {
+                        $q->orWhere(function ($sub_q) use ($and_group, &$clause): void {
+                            foreach ($and_group['conditions'] as $condition) {
+                                $filter_type = $condition['filter_type'] ?? FilterType::Parent;
+                                // whereHas/where van en el grupo; el with siempre sobre la query raíz
+                                self::processSimpleCondition($sub_q, $condition, $filter_type, $clause);
                             }
                         });
                     }
                 });
             } else {
-                // estamos en una condición AND
-                self::processSimpleCondition($clause, $condition_group['condition'], $filter_type);
+                $condition = $condition_group['condition'];
+                $filter_type = $condition['filter_type'] ?? $condition_group['filter_type'] ?? FilterType::Parent;
+                self::processSimpleCondition($clause, $condition, $filter_type, $clause);
             }
         }
     }
 
     /**
-     * Process simple condition ['key', 'operator', 'value', 'path']
+     * Process simple condition ['key', 'operator', 'value', 'path'].
+     *
+     * @param  mixed  $eager_load_query  Query raíz donde fusionar constraints de eager load (Child/Both).
      */
-    private static function processSimpleCondition(&$query, array $condition, FilterType $filter_type): void
+    private static function processSimpleCondition(&$query, array $condition, FilterType $filter_type, mixed &$eager_load_query = null): void
     {
+        $eager_load_query = $eager_load_query ?? $query;
         $has_path = ! empty($condition['path']);
         $relation_path = $has_path ? str_replace('..', '.', $condition['path']) : null;
 
@@ -529,35 +570,69 @@ abstract class CrudRepository
 
         switch ($filter_type) {
             case FilterType::Parent:
-                // Filtra el padre por el valor de los hijos
-                $query->whereHas($relation_path, function ($q) use ($condition) { // project_task_boards..project_task_board_time_budgets..working_times
+                // Filtra el padre; no re-aplica with para no pisar select/order del processParamsStructure
+                $query->whereHas($relation_path, function ($q) use ($condition): void {
                     self::processConditionOperator($q, $condition);
                 });
-                $query->with($relation_path); // --> esto sobreescribe las relaciones cargadas anteriormente
                 break;
 
             case FilterType::Child:
-                // Sólo devuelve los hijos que cumplen con la condición
-                $query->with([$relation_path => function ($q) use ($condition) {
+                // Sólo filtra hijos cargados; fusiona con eager loads previos
+                self::mergeEagerLoadConstraint($eager_load_query, $relation_path, function ($q) use ($condition): void {
                     self::processConditionOperator($q, $condition);
-                }]);
+                });
                 break;
 
-                // lo único que cambia entre el filtro de padres e hijos es la manera en la que se hace el with y que en el filter parent se aplica el whereHas
-                // podemos hacer que filter_both ejecute ambos bloques y así no necesitamos poner explícitamente un case de filter_both
-
             case FilterType::Both:
-                // Devuelve los padres que cumplen la condición y los hijos que también la cumplan
-                $query->whereHas($relation_path, function ($q) use ($condition) {
+                $query->whereHas($relation_path, function ($q) use ($condition): void {
                     self::processConditionOperator($q, $condition);
-                })->with([$relation_path => function ($q) use ($condition) {
+                });
+                self::mergeEagerLoadConstraint($eager_load_query, $relation_path, function ($q) use ($condition): void {
                     self::processConditionOperator($q, $condition);
-                }]);
+                });
                 break;
 
             default:
                 throw new Exception("Unsupported filter type: {$filter_type->value}");
         }
+    }
+
+    /**
+     * Merge a constraint into an existing eager load instead of overwriting it.
+     */
+    private static function mergeEagerLoadConstraint(mixed &$query, string $relation_path, \Closure $constraint): void
+    {
+        $eager_loads = $query->getEagerLoads();
+        $segments = explode('.', $relation_path);
+        $top = $segments[0];
+
+        if (! isset($eager_loads[$top])) {
+            $query->with([$relation_path => $constraint]);
+
+            return;
+        }
+
+        $previous = $eager_loads[$top];
+
+        if (count($segments) === 1) {
+            $query->with([$top => function ($q) use ($previous, $constraint): void {
+                if (is_callable($previous)) {
+                    $previous($q);
+                }
+                $constraint($q);
+            }]);
+
+            return;
+        }
+
+        $nested_path = implode('.', array_slice($segments, 1));
+
+        $query->with([$top => function ($q) use ($previous, $nested_path, $constraint): void {
+            if (is_callable($previous)) {
+                $previous($q);
+            }
+            self::mergeEagerLoadConstraint($q, $nested_path, $constraint);
+        }]);
     }
 
     /**
@@ -567,7 +642,7 @@ abstract class CrudRepository
     {
         $key = $condition['key'];
         $operator = $condition['operator'];
-        $value = trim($condition['value'], '<{}>');
+        $value = mb_trim($condition['value'], '<{}>');
 
         switch (true) {
             case $operator === '=':
@@ -576,9 +651,15 @@ abstract class CrudRepository
             case $operator === '<':
             case $operator === '>=':
             case $operator === '<=':
-            case $operator === 'like':
-            case $operator === 'notLike':
                 $query->where($key, $operator, $value);
+                break;
+
+            case $operator === 'like':
+                $query->where($key, 'like', $value);
+                break;
+
+            case $operator === 'notLike':
+                $query->where($key, 'not like', $value);
                 break;
 
             case $operator === 'in':
@@ -618,7 +699,7 @@ abstract class CrudRepository
                 break;
 
             case str_starts_with($operator, 'date,'): // solo comparará fechas sin horas
-                $real_operator = substr($operator, 5);
+                $real_operator = mb_substr($operator, 5);
                 $query->whereDate($key, $real_operator, $value);
                 break;
 
@@ -627,14 +708,41 @@ abstract class CrudRepository
         }
     }
 
-    /**
-     * Transforms multiple values from string to array
-     */
-    public static function parseMultipleValues(string $raw_value, string $separator = '|'): array
+    private static function appendAttribute(Model $record, Stringable $append): void
     {
-        return array_filter(
-            array_map('trim', explode($separator, $raw_value)),
-            fn ($v) => $v !== ''
-        );
+        $is_appending_main_model = $append->doesntContain('.');
+
+        if ($is_appending_main_model) {
+            $record->append($append->toString());
+
+            return;
+        }
+
+        $relationship_names = $append->explode('.');
+
+        $relationship_attributes = $relationship_names->pop();
+
+        $current_record = $record;
+
+        foreach ($relationship_names as $relationship_name) {
+            if (! $current_record->relationLoaded($relationship_name)) {
+                throw new Exception("Relation '{$relationship_name}' not loaded in model ".$record::class." when appending attribute '{$append}'. Load it using the 'with' parameter.");
+            }
+
+            /** @var Model|null|Collection<int, Model> $current_record */
+            $current_record = $current_record->getRelation($relationship_name);
+        }
+
+        if ($current_record instanceof Model) {
+            $current_record->append($relationship_attributes);
+
+            return;
+        }
+
+        if ($current_record instanceof Collection) {
+            $current_record->each(function (Model $related_model) use ($relationship_attributes): void {
+                $related_model->append($relationship_attributes);
+            });
+        }
     }
 }
