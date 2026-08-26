@@ -221,7 +221,7 @@ abstract class CrudRepository
             $clause->where(App::make(static::$model)->getKeyName(), $id);
         }
 
-        $model = $clause->firstOrFail();
+        $model = $clause->sole();
 
         if (isset($params['append']) && $params['append'] !== '') {
             foreach (explode(',', $params['append']) as $append) {
