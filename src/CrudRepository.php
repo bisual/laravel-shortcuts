@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace Bisual\LaravelShortcuts;
 
 use BackedEnum;
+use Bisual\LaravelShortcuts\Enums\FilterType;
 use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
+use Closure;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Stringable;
@@ -20,6 +18,10 @@ use Illuminate\Support\Stringable;
 abstract class CrudRepository
 {
     public static $model = Model::class;
+
+    // -------------------------------------------------------------------------
+    // A. Public CRUD API
+    // -------------------------------------------------------------------------
 
     /*
      * @params
@@ -42,7 +44,7 @@ abstract class CrudRepository
         }
 
         if (count($params) > 0) {
-            // handling with, order_by and select
+            // query params on deepest with
             $clause = self::getClause($params);
 
             $searchable_fields = (new static::$model)->searchable;
@@ -184,7 +186,8 @@ abstract class CrudRepository
             }
 
             return $data;
-        } elseif ($functionExtraParametersTreatment !== null) {
+        }
+        if ($functionExtraParametersTreatment !== null) {
             $clause = (static::$model)::query();
             if ($functionExtraParametersTreatment !== null) {
                 $functionExtraParametersTreatment($clause, $params);
@@ -198,7 +201,7 @@ abstract class CrudRepository
 
     public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
     {
-        // handling with, order_by and select
+        // query params on deepest with
         $clause = self::getClause($params, $withoutGlobalScopes);
 
         if ($functionExtraParametersTreatment !== null) {
@@ -208,7 +211,7 @@ abstract class CrudRepository
         if ($id instanceof static::$model) {
             return $id;
         } // ja li hem passat el model
-        elseif (is_object($id)) {
+        if (is_object($id)) {
             $id = $id->id;
         } // per si li hem passat algun altre objecte
         elseif (is_array($id)) {
@@ -259,83 +262,57 @@ abstract class CrudRepository
         return $model;
     }
 
-    /**
-     * Other private functions.
-     */
+    // -------------------------------------------------------------------------
+    // B. Query-params orchestration
+    // -------------------------------------------------------------------------
+
     protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
     {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
 
-        // With
-        $with = null;
-        if (isset($params['with'])) {
-            $with = $params['with'];
-            unset($params['with']);
+        $query_params = [];
+        foreach (['with', 'order_by', 'select', 'where'] as $key) {
+            if (isset($params[$key])) {
+                $query_params[$key] = $params[$key];
+                unset($params[$key]);
+            }
         }
 
-        // Order by
-        $order_by = null;
-        if (isset($params['order_by'])) {
-            $order_by = $params['order_by'];
-            unset($params['order_by']);
-        }
-
-        // Select
-        $select = null;
-        if (isset($params['select'])) {
-            $select = $params['select'];
-            unset($params['select']);
-        }
-
-        if ($with || $order_by || $select) {
-            self::handleWithOrderByAndSelect($clause, $with, $order_by, $select);
+        if ($query_params !== []) {
+            self::buildQueryFromParams(
+                $clause,
+                $query_params['with'] ?? null,
+                $query_params['order_by'] ?? null,
+                $query_params['select'] ?? null,
+                $query_params['where'] ?? null,
+            );
         }
 
         return $clause;
     }
 
-    private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null): void
+    private static function buildQueryFromParams(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, $where = null): void
     {
-        $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive
+        $struct = self::getParamsStructure($with, $order_by, $select, $where); // we generate the structure with the data that we receive
         self::processParamsStructure($clause, $struct);
+        if ($where) {
+            self::applyWhereConditionsToStructure($clause, $struct['where_conditions']);
+        }
     }
 
+    // -------------------------------------------------------------------------
+    // C. Parse query strings → structure
+    // -------------------------------------------------------------------------
+
     /**
-     * Process the params structure.
+     * Build struct from with / order_by / select / where query strings.
      *
-     * @param [type] $clause
+     * Format examples:
+     *   with=relation..relation2,user..relation1
+     *   append=relation..relation2.append1
+     *   select=relation..relation2.select_field
      */
-    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
-    {
-        // SELECT
-        if (! empty($struct['select'])) {
-            $clause->select(self::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
-        }
-
-        // ORDER BY
-        if (! empty($struct['order_by'])) {
-            $order_field = array_key_first($struct['order_by']);
-            $direction = $struct['order_by'][$order_field];
-            $clause->orderBy($order_field, $direction);
-        }
-
-        // recursuvity stop condition
-        if (empty($struct['with'])) {
-            return;
-        }
-
-        foreach ($struct['with'] as $relation => $config) {
-            $clause->with($relation, function ($query) use ($relation, $config, $clause): void {
-                $parent_model = $clause->getModel(); // get the parent model
-                self::processParamsStructure($query, $config, $parent_model, $relation);
-            });
-        }
-    }
-
-    /**
-     * Create an array processing params.
-     */
-    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null): array
+    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null): array
     {
         $struct = [];
 
@@ -403,13 +380,13 @@ abstract class CrudRepository
                         if (str_contains($relation_path, '.')) {
                             [$key, $select] = explode('.', $relation_path, 2);
                             if (! array_key_exists($key, $current)) {
-                                throw new Exception("You can't select field that are not in the relation.");
+                                throw new Exception("You can't select field that are not in the relation."); // esto da error
                             }
 
                             $current[$key]['select'] = explode('|', $select);
                         } else {
                             if (! array_key_exists($relation_path, $current)) {
-                                throw new Exception("You can't select field that are not in the relation.");
+                                throw new Exception("You can't select field that are not in the relation."); // esto da error
                             }
 
                             $current = &$current[$relation_path]['with'];
@@ -419,61 +396,348 @@ abstract class CrudRepository
             }
         }
 
+        if ($string_where) {
+            // process $string_where
+            foreach (StringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) {
+                // Default del bloque (sufijo ::parent|child|both al final del segmento)
+                $default_filter_type = self::getFilterType($where_segment);
+
+                $or_conditions = StringDelimitersHelper::explodeOutsideRanges('||', $where_segment);
+
+                if (count($or_conditions) > 1) {
+                    $condition_group = [
+                        'or_group' => true,
+                        'groups' => [],
+                    ];
+
+                    foreach ($or_conditions as $or_condition) {
+                        $condition_group['groups'][] = [
+                            'conditions' => self::parseAndConditions($or_condition, $default_filter_type),
+                        ];
+                    }
+
+                    $struct['where_conditions'][] = $condition_group;
+                } else {
+                    foreach (self::parseAndConditions($where_segment, $default_filter_type) as $condition) {
+                        $struct['where_conditions'][] = [
+                            'filter_type' => $condition['filter_type'],
+                            'condition' => $condition,
+                        ];
+                    }
+                }
+            }
+        }
+
         return $struct;
     }
 
     /**
-     * Get the $model->$relation foreign key data.
+     * Extract group-level ::parent|child|both default from a where segment.
      */
-    private static function getForeignKeyData(Model $model, string $relation): array
+    private static function getFilterType(string &$where_segment): FilterType
     {
-        if (! method_exists($model, $relation)) {
-            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
+        $parts = StringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
+
+        if (count($parts) === 1) {
+            return FilterType::Parent;
         }
 
-        $relation_instance = $model->{$relation}();
+        $maybe_type = $parts[count($parts) - 1];
+        $valid = array_column(FilterType::cases(), 'value');
 
-        if (! $relation_instance instanceof Relation) {
-            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
+        if (! in_array($maybe_type, $valid, true)) {
+            return FilterType::Parent;
         }
 
-        if ($relation_instance instanceof MorphTo
-            || $relation_instance instanceof MorphOne
-            || $relation_instance instanceof MorphMany
-        ) {
-            return [
-                $relation_instance->getForeignKeyName(),
-                $relation_instance->getMorphType(),
-            ];
-        }
+        array_pop($parts);
+        $where_segment = implode('::', $parts);
 
-        if (method_exists($relation_instance, 'getForeignKeyName')) {
-            return [$relation_instance->getForeignKeyName()];
-        }
-
-        return [];
+        return FilterType::from($maybe_type);
     }
 
     /**
-     * Build the select required fomat and fields.
+     * Split a segment by && into condition arrays.
+     * Each condition may override the default filter type with ::parent|child|both.
+     *
+     * @return array<int, array{key: string, operator: string, value: string, path: ?string, filter_type: FilterType}>
      */
-    private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
+    private static function parseAndConditions(string $segment, FilterType $default_filter_type = FilterType::Parent): array
     {
-        return array_unique(array_merge( // array_unique if we get the id from the front
-            ['id'],
-            $select_fields,
-            $parent_model && $relation ? self::getForeignKeyData($parent_model, $relation) : []
-        ));
+        $parts = StringDelimitersHelper::explodeOutsideRanges('&&', $segment);
+
+        return array_map(function (string $condition) use ($default_filter_type): array {
+            $filter_type = self::extractConditionFilterType($condition, $default_filter_type);
+            $parsed = StructHelper::createConditionArray($condition);
+            $parsed['filter_type'] = $filter_type;
+
+            return $parsed;
+        }, $parts);
     }
+
+    /**
+     * Extract optional ::filterType from a single condition, falling back to default.
+     */
+    private static function extractConditionFilterType(string &$condition, FilterType $default): FilterType
+    {
+        $parts = StringDelimitersHelper::explodeOutsideRanges('::', $condition);
+
+        if (count($parts) === 1) {
+            return $default;
+        }
+
+        $maybe_type = $parts[count($parts) - 1];
+        $valid = array_column(FilterType::cases(), 'value');
+
+        if (! in_array($maybe_type, $valid, true)) {
+            return $default;
+        }
+
+        array_pop($parts);
+        $condition = implode('::', $parts);
+
+        return FilterType::from($maybe_type);
+    }
+
+    /**
+     * Transform multiple values from string to array (separator |).
+     */
+    private static function parseMultipleValues(string $raw_value, string $separator = '|'): array
+    {
+        return array_filter(
+            array_map('trim', explode($separator, $raw_value)),
+            fn ($v) => $v !== ''
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // D. Apply with / select / order_by
+    // -------------------------------------------------------------------------
+
+    /**
+     * Apply select, order_by and nested with from the params structure.
+     */
+    private static function processParamsStructure(mixed &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    {
+        // SELECT
+        if (! empty($struct['select'])) {
+            $clause->select(StructHelper::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
+        }
+
+        // ORDER BY
+        if (! empty($struct['order_by'])) {
+            $order_field = array_key_first($struct['order_by']);
+            $direction = $struct['order_by'][$order_field];
+            $clause->orderBy($order_field, $direction);
+        }
+
+        // recursuvity stop condition
+        if (empty($struct['with'])) {
+            return;
+        }
+
+        foreach ($struct['with'] as $relation => $config) {
+            $clause->with($relation, function ($query) use ($relation, $config, $clause): void {
+                $parent_model = $clause->getModel(); // get the parent model
+                self::processParamsStructure($query, $config, $parent_model, $relation);
+            });
+
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // E. Apply where conditions
+    // -------------------------------------------------------------------------
+
+    private static function applyWhereConditionsToStructure(mixed &$clause, array $where_conditions): void
+    {
+        foreach ($where_conditions as $condition_group) {
+            if (! empty($condition_group['or_group'])) {
+                $clause->where(function ($q) use ($condition_group, &$clause): void {
+                    foreach ($condition_group['groups'] as $and_group) {
+                        $q->orWhere(function ($sub_q) use ($and_group, &$clause): void {
+                            foreach ($and_group['conditions'] as $condition) {
+                                $filter_type = $condition['filter_type'] ?? FilterType::Parent;
+                                // whereHas/where van en el grupo; el with siempre sobre la query raíz
+                                self::processSimpleCondition($sub_q, $condition, $filter_type, $clause);
+                            }
+                        });
+                    }
+                });
+            } else {
+                $condition = $condition_group['condition'];
+                $filter_type = $condition['filter_type'] ?? $condition_group['filter_type'] ?? FilterType::Parent;
+                self::processSimpleCondition($clause, $condition, $filter_type, $clause);
+            }
+        }
+    }
+
+    /**
+     * Process simple condition ['key', 'operator', 'value', 'path'].
+     *
+     * @param  mixed  $eager_load_query  Root query for Child/Both eager-load merge.
+     */
+    private static function processSimpleCondition(&$query, array $condition, FilterType $filter_type, mixed &$eager_load_query = null): void
+    {
+        $eager_load_query = $eager_load_query ?? $query;
+        $has_path = ! empty($condition['path']);
+        $relation_path = $has_path ? str_replace('..', '.', $condition['path']) : null;
+
+        if (! $has_path) {
+            self::processConditionOperator($query, $condition);
+
+            return;
+        }
+
+        switch ($filter_type) {
+            case FilterType::Parent:
+                // Filtra el padre; no re-aplica with para no pisar select/order del processParamsStructure
+                $query->whereHas($relation_path, function ($q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                break;
+
+            case FilterType::Child:
+                // Sólo filtra hijos cargados; fusiona con eager loads previos
+                self::mergeEagerLoadConstraint($eager_load_query, $relation_path, function ($q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                break;
+
+            case FilterType::Both:
+                $query->whereHas($relation_path, function ($q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                self::mergeEagerLoadConstraint($eager_load_query, $relation_path, function ($q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                break;
+
+            default:
+                throw new Exception("Unsupported filter type: {$filter_type->value}");
+        }
+    }
+
+    /**
+     * Merge a constraint into an existing eager load instead of overwriting it.
+     */
+    private static function mergeEagerLoadConstraint(mixed &$query, string $relation_path, Closure $constraint): void
+    {
+        $eager_loads = $query->getEagerLoads();
+        $segments = explode('.', $relation_path);
+        $top = $segments[0];
+
+        if (! isset($eager_loads[$top])) {
+            $query->with([$relation_path => $constraint]);
+
+            return;
+        }
+
+        $previous = $eager_loads[$top];
+
+        if (count($segments) === 1) {
+            $query->with([$top => function ($q) use ($previous, $constraint): void {
+                if (is_callable($previous)) {
+                    $previous($q);
+                }
+                $constraint($q);
+            }]);
+
+            return;
+        }
+
+        $nested_path = implode('.', array_slice($segments, 1));
+
+        $query->with([$top => function ($q) use ($previous, $nested_path, $constraint): void {
+            if (is_callable($previous)) {
+                $previous($q);
+            }
+            self::mergeEagerLoadConstraint($q, $nested_path, $constraint);
+        }]);
+    }
+
+    /**
+     * Map operator + value to the corresponding Eloquent where*.
+     */
+    private static function processConditionOperator(&$query, array $condition)
+    {
+        $key = $condition['key'];
+        $operator = $condition['operator'];
+        $value = mb_trim($condition['value'], '<{}>');
+
+        switch (true) {
+            case $operator === '=':
+            case $operator === '!=':
+            case $operator === '>':
+            case $operator === '<':
+            case $operator === '>=':
+            case $operator === '<=':
+                $query->where($key, $operator, $value);
+                break;
+
+            case $operator === 'like':
+                $query->where($key, 'like', $value);
+                break;
+
+            case $operator === 'notLike':
+                $query->where($key, 'not like', $value);
+                break;
+
+            case $operator === 'in':
+                $arr_values = self::parseMultipleValues($value);
+                $query->whereIn($key, $arr_values);
+                break;
+
+            case $operator === 'notIn':
+                $arr_values = self::parseMultipleValues($value);
+                $query->whereNotIn($key, $arr_values);
+                break;
+
+            case $operator === 'null':
+                $query->whereNull($key);
+                break;
+
+            case $operator === 'notNull':
+                $query->whereNotNull($key);
+                break;
+
+            case $operator === 'between':
+                $arr_values = self::parseMultipleValues($value);
+                if (count($arr_values) !== 2) {
+                    throw new Exception("Operator {$condition['operator']} requires exactly two values.");
+                }
+
+                $query->whereBetween($key, $arr_values);
+                break;
+
+            case $operator === 'notBetween':
+                $arr_values = self::parseMultipleValues($value);
+                if (count($arr_values) !== 2) {
+                    throw new Exception("Operator {$condition['operator']} requires exactly two values.");
+                }
+
+                $query->whereNotBetween($key, $arr_values);
+                break;
+
+            case str_starts_with($operator, 'date,'): // solo comparará fechas sin horas
+                $real_operator = mb_substr($operator, 5);
+                $query->whereDate($key, $real_operator, $value);
+                break;
+
+            default:
+                throw new Exception("Unsupported operator: {$operator}");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // F. Result post-processing
+    // -------------------------------------------------------------------------
 
     private static function appendAttribute(Model $record, Stringable $append): void
     {
         $is_appending_main_model = $append->doesntContain('.');
 
         if ($is_appending_main_model) {
-            $attributes = $append;
-
-            $record->append($attributes->toString());
+            $record->append($append->toString());
 
             return;
         }
