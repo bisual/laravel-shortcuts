@@ -24,10 +24,10 @@ abstract class CrudRepository
 
     /**
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
-     *  - with
-     *  - without
-     *  - append
-     *  - ... other attributes to filter
+     *                                                                  - with
+     *                                                                  - without
+     *                                                                  - append
+     *                                                                  - ... other attributes to filter
      */
     public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null)
     {
@@ -300,7 +300,7 @@ abstract class CrudRepository
     /**
      * Process the params structure.
      */
-    private static function processParamsStructure(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    private static function processParamsStructure(Builder|Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
         if (! empty($struct['select'])) {
@@ -546,7 +546,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation  $clause
+     * @param  Builder|Relation  $clause
      */
     private static function applyEagerLoadConstraint($clause, string $attribute, mixed $val): void
     {
@@ -609,7 +609,7 @@ abstract class CrudRepository
     /**
      * Filter parent rows by related attributes. MorphTo uses whereHasMorph so each type is queried on its own table.
      */
-    private static function applyRelationExistenceFilter(\Illuminate\Database\Eloquent\Builder $clause, Model $model, string $relation, string $attribute, mixed $val): void
+    private static function applyRelationExistenceFilter(Builder $clause, Model $model, string $relation, string $attribute, mixed $val): void
     {
         $top_relation = explode('.', $relation)[0];
         $relation_instance = self::getRelation($model, $top_relation);
@@ -642,7 +642,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder  $clause
+     * @param  Builder  $clause
      * @param  array<string, mixed>  $struct
      */
     private static function applyRelationExistenceFilters($clause, array $struct): void
