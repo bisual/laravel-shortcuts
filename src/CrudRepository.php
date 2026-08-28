@@ -88,10 +88,6 @@ abstract class CrudRepository
                     if ($val !== null && $val !== '') {
                         $relation_filter = self::getRelationFilter($model_inst, $attr);
 
-                        // dd([
-                        //     'relation_filter' => $relation_filter,
-                        // ]);
-
                         if ($relation_filter !== null) {
                             self::applyRelationExistenceFilter($clause, $model_inst, $relation_filter['relation'], $relation_filter['attribute'], $val);
                         } elseif ($val === 'null') {
@@ -314,7 +310,7 @@ abstract class CrudRepository
             $clause->orderBy($order_field, $direction);
         }
 
-        // CONSTRAINTS on eager-loaded relations (?with=relacion&relacion.attribute=value)
+        // CONSTRAINTS on eager-loaded relations (?with=relation&relation.attribute=value)
         if (! empty($struct['constraints'])) {
             foreach ($struct['constraints'] as $constraint) {
                 self::applyEagerLoadConstraint($clause, $constraint['attribute'], $constraint['value']);
@@ -477,7 +473,7 @@ abstract class CrudRepository
     }
 
     /**
-     * Pull `relacion.attribute=value` params that target eager-loaded relations.
+     * Pull `relation.attribute=value` params that target eager-loaded relations.
      *
      * @param  array<string, mixed>  $params
      * @return array<string, list<array{attribute: string, value: mixed}>>
@@ -580,9 +576,6 @@ abstract class CrudRepository
     private static function getRelationFilter(Model $model, string $attr): ?array
     {
         // TODO: revisar si cal fer doble verificació del separador, why '-' char?
-        // TODO: revisar si cal fer doble verificació del separador, why '-' char?
-        // TODO: revisar si cal fer doble verificació del separador, why '-' char?
-        // TODO: revisar si cal fer doble verificació del separador, why '-' char?
         $separator = str_contains($attr, '.') ? '.' : '-';
         if ($separator === null) {
             return null;
@@ -613,11 +606,6 @@ abstract class CrudRepository
     {
         $top_relation = explode('.', $relation)[0];
         $relation_instance = self::getRelation($model, $top_relation);
-
-        // dd([
-        //     'top_relation' => $top_relation,
-        //     'relation_instance' => $relation_instance,
-        // ]);
 
         if ($relation_instance instanceof MorphTo) {
             $clause->whereHasMorph($top_relation, '*', function ($query, string $type) use ($attribute, $val): void {
