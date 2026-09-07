@@ -286,7 +286,7 @@ abstract class CrudRepository
         return $clause;
     }
 
-    private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
+    private static function handleWithOrderByAndSelect(Builder &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
     {
         $struct = self::getParamsStructure($with, $order_by, $select, $with_constraints);
         self::processParamsStructure($clause, $struct);
