@@ -328,28 +328,26 @@ abstract class CrudRepository
             }
         }
 
-        // recursuvity stop condition
-        if (empty($struct['with'])) {
-            return;
-        }
+        // WITH
+        if (! empty($struct['with'])) {
+            foreach ($struct['with'] as $nested_relation => $config) {
+                $parent_model_for_relation = $clause->getModel();
+                $relation_instance = self::getRelation($parent_model_for_relation, $nested_relation);
 
-        foreach ($struct['with'] as $nested_relation => $config) {
-            $parent_model_for_relation = $clause->getModel();
-            $relation_instance = self::getRelation($parent_model_for_relation, $nested_relation);
+                if ($relation_instance instanceof MorphTo) {
+                    $clause->with($nested_relation, function (MorphTo $query) use ($nested_relation, $config, $clause): void {
+                        $parent_model = $clause->getModel();
+                        self::processMorphToWith($query, $config, $parent_model, $nested_relation);
+                    });
 
-            if ($relation_instance instanceof MorphTo) {
-                $clause->with($nested_relation, function (MorphTo $query) use ($nested_relation, $config, $clause): void {
+                    continue;
+                }
+
+                $clause->with($nested_relation, function (Relation $r) use ($nested_relation, $config, $clause): void {
                     $parent_model = $clause->getModel();
-                    self::processMorphToWith($query, $config, $parent_model, $nested_relation);
+                    self::processParamsStructure($r, $config, $parent_model, $nested_relation);
                 });
-
-                continue;
             }
-
-            $clause->with($nested_relation, function (Relation $r) use ($nested_relation, $config, $clause): void {
-                $parent_model = $clause->getModel();
-                self::processParamsStructure($r, $config, $parent_model, $nested_relation);
-            });
         }
     }
 
