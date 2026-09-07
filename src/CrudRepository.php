@@ -133,16 +133,16 @@ abstract class CrudRepository
 
             // Process Searchable Fields
             if ($search) {
-                $clause->where(function ($query) use (&$searchable_fields, &$search): void {
+                $clause->where(function (Builder $query) use (&$searchable_fields, &$search): void {
                     foreach ($searchable_fields as $idx => $search_field) {
                         $parts = explode('.', $search_field);
                         if (count($parts) === 2) {
                             if ($idx === 0) {
-                                $query->whereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                $query->whereHas($parts[0], function (Builder $query) use (&$parts, &$search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             } else {
-                                $query->orWhereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                $query->orWhereHas($parts[0], function (Builder $query) use (&$parts, &$search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             }
@@ -335,9 +335,9 @@ abstract class CrudRepository
                 continue;
             }
 
-            $clause->with($nested_relation, function ($query) use ($nested_relation, $config, $clause): void {
+            $clause->with($nested_relation, function (Relation $r) use ($nested_relation, $config, $clause): void {
                 $parent_model = $clause->getModel();
-                self::processParamsStructure($query, $config, $parent_model, $nested_relation);
+                self::processParamsStructure($r, $config, $parent_model, $nested_relation);
             });
         }
     }
@@ -365,8 +365,8 @@ abstract class CrudRepository
                     continue;
                 }
 
-                $with_for_type[$nested_relation] = function (Builder|Relation $query) use ($class, $nested_relation, $nested_config): void {
-                    self::processParamsStructure($query, $nested_config, new $class, $nested_relation);
+                $with_for_type[$nested_relation] = function (Relation $r) use ($class, $nested_relation, $nested_config): void {
+                    self::processParamsStructure($r, $nested_config, new $class, $nested_relation);
                 };
             }
 
@@ -605,7 +605,7 @@ abstract class CrudRepository
         $relation_instance = self::getRelation($model, $top_relation);
 
         if ($relation_instance instanceof MorphTo) {
-            $clause->whereHasMorph($top_relation, '*', function ($query, string $type) use ($attribute, $val): void {
+            $clause->whereHasMorph($top_relation, '*', function (Builder $query, string $type) use ($attribute, $val): void {
                 $class = Model::getActualClassNameForMorph($type);
                 if (! self::modelHasColumn($class, $attribute)) {
                     $query->whereRaw('0 = 1');
@@ -671,7 +671,7 @@ abstract class CrudRepository
                 continue;
             }
 
-            $functionExtraParametersTreatments[$class] = function ($query) use ($applicable): void {
+            $functionExtraParametersTreatments[$class] = function (Builder $query) use ($applicable): void {
                 foreach ($applicable as $constraint) {
                     self::applyEagerLoadConstraint($query, $constraint['attribute'], $constraint['value']);
                 }
