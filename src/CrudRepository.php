@@ -365,7 +365,7 @@ abstract class CrudRepository
                     continue;
                 }
 
-                $with_for_type[$nested_relation] = function ($query) use ($class, $nested_relation, $nested_config): void {
+                $with_for_type[$nested_relation] = function (Builder|Relation $query) use ($class, $nested_relation, $nested_config): void {
                     self::processParamsStructure($query, $nested_config, new $class, $nested_relation);
                 };
             }
