@@ -24,10 +24,6 @@ abstract class CrudRepository
 
     /**
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
-     *                                                                  - with
-     *                                                                  - without
-     *                                                                  - append
-     *                                                                  - ... other attributes to filter
      */
     public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null)
     {
@@ -183,7 +179,11 @@ abstract class CrudRepository
         return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
     }
 
-    public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
+    /**
+     * @param  int|string|array<string, int|string>|object  $id
+     * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     */
+    public static function show(int|string|array|object $id, array $params = [], ?callable $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
     {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
@@ -224,7 +224,10 @@ abstract class CrudRepository
         return (static::$model)::create($data);
     }
 
-    public static function update($model, $params)
+    /**
+     * @param  int|string|array<string, int|string>|object  $model
+     */
+    public static function update(int|string|array|object $model, array $params)
     {
         $model = self::show($model);
 
@@ -233,7 +236,10 @@ abstract class CrudRepository
         return $model->fresh();
     }
 
-    public static function destroy($model, $functionExtraParametersTreatment = null)
+    /**
+     * @param  int|string|array<string, int|string>|object  $model
+     */
+    public static function destroy(int|string|array|object $model, ?callable $functionExtraParametersTreatment = null)
     {
         $model = self::show($model);
 
@@ -246,7 +252,10 @@ abstract class CrudRepository
         return $model;
     }
 
-    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
+    /**
+     * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     */
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): Builder
     {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
 
@@ -283,6 +292,9 @@ abstract class CrudRepository
         return $clause;
     }
 
+    /**
+     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
+     */
     private static function handleWithOrderByAndSelect(Builder &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
     {
         $struct = self::getParamsStructure($with, $order_by, $select, $with_constraints);
@@ -290,6 +302,14 @@ abstract class CrudRepository
         self::applyRelationExistenceFilters($clause, $struct);
     }
 
+    /**
+     * @param  array{
+     *     with?: array<string, array>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $struct
+     */
     private static function processParamsStructure(Builder|Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
@@ -376,6 +396,14 @@ abstract class CrudRepository
 
     /**
      * Create an array processing params.
+     *
+     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
+     * @return array{
+     *     with?: array<string, array>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }
      */
     private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, array $with_constraints = []): array
     {
@@ -469,8 +497,8 @@ abstract class CrudRepository
     /**
      * Pull `relation.attribute=value` params that target eager-loaded relations.
      *
-     * @param  array<string, mixed>  $params
-     * @return array<string, list<array{attribute: string, value: mixed}>>
+     * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>
      */
     private static function extractWithConstraints(array &$params, string $with): array
     {
@@ -513,8 +541,13 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array<string, mixed>  $struct
-     * @param  array<string, list<array{attribute: string, value: mixed}>>  $with_constraints
+     * @param  array{
+     *     with?: array<string, array>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $struct
+     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
      */
     private static function attachWithConstraints(array &$struct, array $with_constraints): void
     {
@@ -535,12 +568,14 @@ abstract class CrudRepository
         }
     }
 
-    private static function applyEagerLoadConstraint(Builder|Relation $clause, string $attribute, mixed $val): void
+    private static function applyEagerLoadConstraint(Builder|Relation $clause, string $attribute, int|string|bool|BackedEnum|null $val): void
     {
         if ($val === null || $val === 'null') {
             $clause->whereNull($attribute);
         } elseif ($val === 'notnull') {
             $clause->whereNotNull($attribute);
+        } elseif ($val instanceof BackedEnum) {
+            $clause->where($attribute, $val);
         } elseif (str_contains((string) $val, ',')) {
             $clause->whereIn($attribute, explode(',', $val));
         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
@@ -590,7 +625,7 @@ abstract class CrudRepository
     /**
      * Filter parent rows by related attributes. MorphTo uses whereHasMorph so each type is queried on its own table.
      */
-    private static function applyRelationExistenceFilter(Builder $clause, Model $model, string $relation, string $attribute, mixed $val): void
+    private static function applyRelationExistenceFilter(Builder $clause, Model $model, string $relation, string $attribute, int|string|bool|BackedEnum|null $val): void
     {
         $top_relation = explode('.', $relation)[0];
         $relation_instance = self::getRelation($model, $top_relation);
@@ -617,7 +652,12 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array<string, mixed>  $struct
+     * @param  array{
+     *     with?: array<string, array>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $struct
      */
     private static function applyRelationExistenceFilters(Builder $clause, array $struct): void
     {
@@ -635,7 +675,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  list<array{attribute: string, value: mixed}>  $constraints
+     * @param  list<array{attribute: string, value: int|string|bool|BackedEnum|null}>  $constraints
      */
     private static function constrainMorphTo(MorphTo $morph_to, array $constraints): void
     {
@@ -706,6 +746,8 @@ abstract class CrudRepository
 
     /**
      * Get the $model->$relation foreign key data.
+     *
+     * @return list<string>
      */
     private static function getForeignKeyData(Model $model, string $relation): array
     {
@@ -738,6 +780,9 @@ abstract class CrudRepository
 
     /**
      * Build the select required fomat and fields.
+     *
+     * @param  list<string>  $select_fields
+     * @return list<string>
      */
     private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
     {
