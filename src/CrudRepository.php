@@ -575,13 +575,10 @@ abstract class CrudRepository
      */
     private static function getRelationFilter(Model $model, string $attr): ?array
     {
-        // TODO: revisar si cal fer doble verificació del separador, why '-' char?
         $separator = str_contains($attr, '.') ? '.' : '-';
-        if ($separator === null) {
-            return null;
-        }
 
         $parts = explode($separator, $attr);
+
         if (count($parts) < 2) {
             return null;
         }
