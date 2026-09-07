@@ -44,6 +44,7 @@ abstract class CrudRepository
 
             /** @var list<string>|null $searchable_fields */
             $searchable_fields = (new static::$model)->searchable;
+            
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
                 $search = $params['search'];
@@ -302,7 +303,16 @@ abstract class CrudRepository
     /**
      * @param  array{
      *     with?: array<string, array{
-     *         with?: array<string, array<string, mixed>>,
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
      *         select?: list<string>,
      *         order_by?: array<string, string>,
      *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -359,7 +369,16 @@ abstract class CrudRepository
     /**
      * @param  array{
      *     with?: array<string, array{
-     *         with?: array<string, array<string, mixed>>,
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
      *         select?: list<string>,
      *         order_by?: array<string, string>,
      *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -417,7 +436,16 @@ abstract class CrudRepository
      * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
      * @return array{
      *     with?: array<string, array{
-     *         with?: array<string, array<string, mixed>>,
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
      *         select?: list<string>,
      *         order_by?: array<string, string>,
      *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -429,7 +457,7 @@ abstract class CrudRepository
      */
     private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, array $with_constraints = []): array
     {
-        /** @var array{with?: array<string, array{with?: array<string, array<string, mixed>>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>} $struct */
+        /** @var array{with?: array<string, array{with?: array<string, array{with?: array<string, array{select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>} $struct */
         $struct = [];
 
         if ($string_with) {
@@ -572,7 +600,16 @@ abstract class CrudRepository
     /**
      * @param  array{
      *     with?: array<string, array{
-     *         with?: array<string, array<string, mixed>>,
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
      *         select?: list<string>,
      *         order_by?: array<string, string>,
      *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -690,7 +727,16 @@ abstract class CrudRepository
     /**
      * @param  array{
      *     with?: array<string, array{
-     *         with?: array<string, array<string, mixed>>,
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
      *         select?: list<string>,
      *         order_by?: array<string, string>,
      *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -729,6 +775,7 @@ abstract class CrudRepository
 
         foreach (array_keys($morph_to->getDictionary()) as $type) {
             $class = Model::getActualClassNameForMorph((string) $type);
+
             $applicable = array_values(array_filter(
                 $constraints,
                 fn (array $constraint): bool => self::modelHasColumn($class, $constraint['attribute'])
