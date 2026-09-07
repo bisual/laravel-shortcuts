@@ -646,7 +646,9 @@ abstract class CrudRepository
         $attribute = array_pop($parts);
         $relation = implode($separator, $parts);
 
-        if ($attribute === '' || $relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null) {
+        $is_invalid_relation_filter = $attribute === '' || $relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null;
+
+        if ($is_invalid_relation_filter) {
             return null;
         }
 
