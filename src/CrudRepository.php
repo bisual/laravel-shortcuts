@@ -8,6 +8,7 @@ use BackedEnum;
 use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
@@ -21,14 +22,10 @@ abstract class CrudRepository
 {
     public static $model = Model::class;
 
-    /*
-     * @params
-     *      - with
-     *      - without
-     *      - append
-     *      - ... other attributes to filter
+    /**
+     * @param  array<string, int|string|bool|BackedEnum|null>  $params
      */
-    public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
+    public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null)
     {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
@@ -45,7 +42,9 @@ abstract class CrudRepository
             // handling with, order_by and select
             $clause = self::getClause($params);
 
+            /** @var list<string>|null $searchable_fields */
             $searchable_fields = (new static::$model)->searchable;
+            
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
                 $search = $params['search'];
@@ -74,34 +73,23 @@ abstract class CrudRepository
             }
 
             // Extra parameters treatment
-            if ($functionExtraParametersTreatment !== null) {
+            if (is_callable($functionExtraParametersTreatment)) {
                 $functionExtraParametersTreatment($clause, $params);
             }
 
+            /** @var list<array<int, int|string|bool|null>> $whereClause */
             $whereClause = [];
+
             if (count($params) > 0) {
                 $model_inst = (new static::$model);
+
                 foreach ($params as $attr => $val) {
                     if ($val !== null && $val !== '') {
-                        if (str_contains($attr, '-')) {
-                            $separate = explode('-', $attr);
-                            $relations = implode('-', array_slice($separate, 0, -1));
-                            $attribute = $separate[count($separate) - 1];
-                            $table = (new static::$model)->{$relations}()->getRelated()->getTable();
-                            $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table, &$model_inst): void {
-                                if ($val === null || $val === 'null') {
-                                    $q->whereNull($table.'.'.$attribute);
-                                } elseif ($val === 'notnull') {
-                                    $q->whereNotNull($table.'.'.$attribute);
-                                } elseif (str_contains($val, ',')) {
-                                    $q->whereIn($table.'.'.$attribute, explode(',', $val));
-                                } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
-                                    $q->where($table.'.'.$attribute, $val);
-                                } else {
-                                    $q->where($table.'.'.$attribute, 'like', "%{$val}%");
-                                }
-                            });
-                        } elseif ($val === null || $val === 'null') {
+                        $relation_filter = self::getRelationFilter($model_inst, $attr);
+
+                        if ($relation_filter !== null) {
+                            self::applyRelationExistenceFilter($clause, $model_inst, $relation_filter['relation'], $relation_filter['attribute'], $val);
+                        } elseif ($val === 'null') {
                             $whereClause[] = [$attr, null]; // $q->whereNull($attribute);
                         } elseif ($val === 'notnull') {
                             $clause->whereNotNull($attr);
@@ -123,14 +111,12 @@ abstract class CrudRepository
             $clause = $clause->where($whereClause);
 
             // Process Scopes
-            if ($scopes !== null) {
-                $scopes = explode(',', $scopes);
-                foreach ($scopes as $scope) {
+            if (is_string($scopes)) {
+                foreach (explode(',', $scopes) as $scope) {
                     $scope_destruct = explode(':', $scope);
                     if (count($scope_destruct) > 0) {
                         $scope_method = array_shift($scope_destruct);
-                        $scope_params = $scope_destruct;
-                        $clause->{$scope_method}(...$scope_params);
+                        $clause->{$scope_method}(...$scope_destruct);
                     }
                 }
             }
@@ -144,16 +130,16 @@ abstract class CrudRepository
 
             // Process Searchable Fields
             if ($search) {
-                $clause->where(function ($query) use (&$searchable_fields, &$search): void {
+                $clause->where(function (Builder $query) use (&$searchable_fields, &$search): void {
                     foreach ($searchable_fields as $idx => $search_field) {
                         $parts = explode('.', $search_field);
                         if (count($parts) === 2) {
                             if ($idx === 0) {
-                                $query->whereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                $query->whereHas($parts[0], function (Builder $query) use (&$parts, &$search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             } else {
-                                $query->orWhereHas($parts[0], function ($query) use (&$parts, &$search): void {
+                                $query->orWhereHas($parts[0], function (Builder $query) use (&$parts, &$search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             }
@@ -184,11 +170,9 @@ abstract class CrudRepository
             }
 
             return $data;
-        } elseif ($functionExtraParametersTreatment !== null) {
+        } elseif (is_callable($functionExtraParametersTreatment)) {
             $clause = (static::$model)::query();
-            if ($functionExtraParametersTreatment !== null) {
-                $functionExtraParametersTreatment($clause, $params);
-            }
+            $functionExtraParametersTreatment($clause, $params);
 
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
@@ -196,7 +180,11 @@ abstract class CrudRepository
         return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
     }
 
-    public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
+    /**
+     * @param  int|string|array<string, int|string>|object  $id
+     * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     */
+    public static function show(int|string|array|object $id, array $params = [], ?callable $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
     {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
@@ -237,7 +225,10 @@ abstract class CrudRepository
         return (static::$model)::create($data);
     }
 
-    public static function update($model, $params)
+    /**
+     * @param  int|string|array<string, int|string>|object  $model
+     */
+    public static function update(int|string|array|object $model, array $params)
     {
         $model = self::show($model);
 
@@ -246,7 +237,10 @@ abstract class CrudRepository
         return $model->fresh();
     }
 
-    public static function destroy($model, $functionExtraParametersTreatment = null)
+    /**
+     * @param  int|string|array<string, int|string>|object  $model
+     */
+    public static function destroy(int|string|array|object $model, ?callable $functionExtraParametersTreatment = null)
     {
         $model = self::show($model);
 
@@ -260,9 +254,9 @@ abstract class CrudRepository
     }
 
     /**
-     * Other private functions.
+     * @param  array<string, int|string|bool|BackedEnum|null>  $params
      */
-    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): Builder
     {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
 
@@ -288,24 +282,47 @@ abstract class CrudRepository
         }
 
         if ($with || $order_by || $select) {
-            self::handleWithOrderByAndSelect($clause, $with, $order_by, $select);
+            $with_constraints = $with ? self::extractWithConstraints($params, $with) : [];
+
+            self::handleWithOrderByAndSelect($clause, $with, $order_by, $select, $with_constraints);
         }
 
         return $clause;
     }
 
-    private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null): void
+    /**
+     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
+     */
+    private static function handleWithOrderByAndSelect(Builder &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
     {
-        $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive
+        $struct = self::getParamsStructure($with, $order_by, $select, $with_constraints);
         self::processParamsStructure($clause, $struct);
+        self::applyRelationExistenceFilters($clause, $struct);
     }
 
     /**
-     * Process the params structure.
-     *
-     * @param [type] $clause
+     * @param  array{
+     *     with?: array<string, array{
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $struct
      */
-    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    private static function processParamsStructure(Builder|Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
         if (! empty($struct['select'])) {
@@ -319,24 +336,128 @@ abstract class CrudRepository
             $clause->orderBy($order_field, $direction);
         }
 
-        // recursuvity stop condition
-        if (empty($struct['with'])) {
+        // CONSTRAINTS on eager-loaded relations (?with=relation&relation.attribute=value)
+        if (! empty($struct['constraints'])) {
+            foreach ($struct['constraints'] as $constraint) {
+                self::applyEagerLoadConstraint($clause, $constraint['attribute'], $constraint['value']);
+            }
+        }
+
+        // WITH
+        if (! empty($struct['with'])) {
+            foreach ($struct['with'] as $nested_relation => $config) {
+                $parent_model_for_relation = $clause->getModel();
+                $relation_instance = self::getRelation($parent_model_for_relation, $nested_relation);
+
+                if ($relation_instance instanceof MorphTo) {
+                    $clause->with($nested_relation, function (MorphTo $query) use ($nested_relation, $config, $clause): void {
+                        $parent_model = $clause->getModel();
+                        self::processMorphToWith($query, $config, $parent_model, $nested_relation);
+                    });
+
+                    continue;
+                }
+
+                $clause->with($nested_relation, function (Relation $r) use ($nested_relation, $config, $clause): void {
+                    $parent_model = $clause->getModel();
+                    self::processParamsStructure($r, $config, $parent_model, $nested_relation);
+                });
+            }
+        }
+    }
+
+    /**
+     * @param  array{
+     *     with?: array<string, array{
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $config
+     */
+    private static function processMorphToWith(MorphTo $morph_to, array $config, Model $parent_model, string $relation): void
+    {
+        $nested_with = $config['with'] ?? [];
+        $constraints = $config['constraints'] ?? [];
+        unset($config['with'], $config['constraints']);
+
+        self::processParamsStructure($morph_to, $config, $parent_model, $relation);
+        self::constrainMorphTo($morph_to, $constraints);
+
+        if ($nested_with === []) {
             return;
         }
 
-        foreach ($struct['with'] as $relation => $config) {
-            $clause->with($relation, function ($query) use ($relation, $config, $clause): void {
-                $parent_model = $clause->getModel(); // get the parent model
-                self::processParamsStructure($query, $config, $parent_model, $relation);
-            });
+        /** @var array<class-string<Model>, array<string, \Closure(Relation): void>> $morph_with */
+        $morph_with = [];
+
+        foreach (array_keys($morph_to->getDictionary()) as $type) {
+            $class = Model::getActualClassNameForMorph((string) $type);
+
+            /** @var array<string, \Closure(Relation): void> $with_for_type */
+            $with_for_type = [];
+
+            foreach ($nested_with as $nested_relation => $nested_config) {
+                if (! method_exists($class, $nested_relation)) {
+                    continue;
+                }
+
+                $with_for_type[$nested_relation] = function (Relation $r) use ($class, $nested_relation, $nested_config): void {
+                    self::processParamsStructure($r, $nested_config, new $class, $nested_relation);
+                };
+            }
+
+            if ($with_for_type !== []) {
+                $morph_with[$class] = $with_for_type;
+            }
+        }
+
+        if ($morph_with !== []) {
+            $morph_to->morphWith($morph_with);
         }
     }
 
     /**
      * Create an array processing params.
+     *
+     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
+     * @return array{
+     *     with?: array<string, array{
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }
      */
-    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null): array
+    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, array $with_constraints = []): array
     {
+        /** @var array{with?: array<string, array{with?: array<string, array{with?: array<string, array{select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>} $struct */
         $struct = [];
 
         if ($string_with) {
@@ -419,11 +540,303 @@ abstract class CrudRepository
             }
         }
 
+        self::attachWithConstraints($struct, $with_constraints);
+
         return $struct;
     }
 
     /**
+     * Pull `relation.attribute=value` params that target eager-loaded relations.
+     *
+     * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>
+     */
+    private static function extractWithConstraints(array &$params, string $with): array
+    {
+        /** @var array<string, true> $relation_paths */
+        $relation_paths = [];
+
+        foreach (explode(',', $with) as $segment) {
+            $segment = trim($segment);
+            if ($segment === '') {
+                continue;
+            }
+
+            /** @var list<string> $current_path */
+            $current_path = [];
+
+            foreach (explode('..', $segment) as $relation) {
+                $current_path[] = $relation;
+                $relation_paths[implode('.', $current_path)] = true;
+            }
+        }
+
+        /** @var array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>> $constraints */
+        $constraints = [];
+
+        foreach ($params as $attr => $val) {
+            if (! is_string($attr) || ! str_contains($attr, '.')) {
+                continue;
+            }
+
+            $last_dot = strrpos($attr, '.');
+            $relation_path = substr($attr, 0, $last_dot);
+            $attribute = substr($attr, $last_dot + 1);
+
+            if ($attribute === '' || ! isset($relation_paths[$relation_path])) {
+                continue;
+            }
+
+            $constraints[$relation_path][] = [
+                'attribute' => $attribute,
+                'value' => $val,
+            ];
+            unset($params[$attr]);
+        }
+
+        return $constraints;
+    }
+
+    /**
+     * @param  array{
+     *     with?: array<string, array{
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $struct
+     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
+     */
+    private static function attachWithConstraints(array &$struct, array $with_constraints): void
+    {
+        foreach ($with_constraints as $path => $filters) {
+            $current = &$struct;
+            foreach (explode('.', $path) as $relation) {
+                if (! isset($current['with'][$relation])) {
+                    unset($current);
+
+                    continue 2;
+                }
+
+                $current = &$current['with'][$relation];
+            }
+
+            $current['constraints'] = array_merge($current['constraints'] ?? [], $filters);
+            unset($current);
+        }
+    }
+
+    private static function applyEagerLoadConstraint(Builder|Relation $clause, string $attribute, int|string|bool|BackedEnum|null $val): void
+    {
+        if ($val === null || $val === 'null') {
+            $clause->whereNull($attribute);
+        } elseif ($val === 'notnull') {
+            $clause->whereNotNull($attribute);
+        } elseif ($val instanceof BackedEnum) {
+            $clause->where($attribute, $val);
+        } elseif (str_contains((string) $val, ',')) {
+            $clause->whereIn($attribute, explode(',', $val));
+        } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
+            $clause->where($attribute, $val);
+        } else {
+            $clause->where($attribute, 'like', "%{$val}%");
+        }
+    }
+
+    private static function getRelation(Model $model, string $relation): ?Relation
+    {
+        if (! method_exists($model, $relation)) {
+            return null;
+        }
+
+        $relation_instance = $model->{$relation}();
+
+        return $relation_instance instanceof Relation ? $relation_instance : null;
+    }
+
+    /**
+     * @return array{relation: string, attribute: string}|null
+     */
+    private static function getRelationFilter(Model $model, string $attr): ?array
+    {
+        $separator = str_contains($attr, '.') ? '.' : '-';
+
+        $parts = explode($separator, $attr);
+
+        if (count($parts) < 2) {
+            return null;
+        }
+
+        $attribute = array_pop($parts);
+        $relation = implode($separator, $parts);
+
+        $is_invalid_relation_filter = $attribute === '' || $relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null;
+
+        if ($is_invalid_relation_filter) {
+            return null;
+        }
+
+        return [
+            'relation' => $relation,
+            'attribute' => $attribute,
+        ];
+    }
+
+    /**
+     * Filter parent rows by related attributes. MorphTo uses whereHasMorph so each type is queried on its own table.
+     */
+    private static function applyRelationExistenceFilter(Builder $clause, Model $model, string $relation, string $attribute, int|string|bool|BackedEnum|null $val): void
+    {
+        $top_relation = explode('.', $relation)[0];
+        $relation_instance = self::getRelation($model, $top_relation);
+
+        if ($relation_instance instanceof MorphTo) {
+            $types = self::morphTypesHavingColumn($model, $relation_instance, $attribute);
+
+            $clause->whereHasMorph($top_relation, $types, function (Builder $query) use ($attribute, $val): void {
+                self::applyEagerLoadConstraint($query, $attribute, $val);
+            });
+
+            return;
+        }
+
+        if ($relation_instance === null) {
+            return;
+        }
+
+        $table = $relation_instance->getRelated()->getTable();
+
+        $clause->whereHas($relation, function (Builder $q) use ($attribute, $val, $table): void {
+            self::applyEagerLoadConstraint($q, $table.'.'.$attribute, $val);
+        });
+    }
+
+    /**
+     * @param  array{
+     *     with?: array<string, array{
+     *         with?: array<string, array{
+     *             with?: array<string, array{
+     *                 select?: list<string>,
+     *                 order_by?: array<string, string>,
+     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *             }>,
+     *             select?: list<string>,
+     *             order_by?: array<string, string>,
+     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *         }>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $struct
+     */
+    private static function applyRelationExistenceFilters(Builder $clause, array $struct): void
+    {
+        foreach ($struct['with'] ?? [] as $relation => $config) {
+            if (empty($config['constraints'])) {
+                continue;
+            }
+
+            $model = $clause->getModel();
+
+            foreach ($config['constraints'] as $constraint) {
+                self::applyRelationExistenceFilter($clause, $model, $relation, $constraint['attribute'], $constraint['value']);
+            }
+        }
+    }
+
+    /**
+     * @param  list<array{attribute: string, value: int|string|bool|BackedEnum|null}>  $constraints
+     */
+    private static function constrainMorphTo(MorphTo $morph_to, array $constraints): void
+    {
+        if ($constraints === []) {
+            return;
+        }
+
+        /** @var array<class-string<Model>, \Closure(Builder): void> $functionExtraParametersTreatments */
+        $functionExtraParametersTreatments = [];
+
+        foreach (array_keys($morph_to->getDictionary()) as $type) {
+            $class = Model::getActualClassNameForMorph((string) $type);
+
+            $applicable = array_values(array_filter(
+                $constraints,
+                fn (array $constraint): bool => self::modelHasColumn($class, $constraint['attribute'])
+            ));
+
+            if ($applicable === []) {
+                continue;
+            }
+
+            $functionExtraParametersTreatments[$class] = function (Builder $query) use ($applicable): void {
+                foreach ($applicable as $constraint) {
+                    self::applyEagerLoadConstraint($query, $constraint['attribute'], $constraint['value']);
+                }
+            };
+        }
+
+        if ($functionExtraParametersTreatments !== []) {
+            $morph_to->constrain($functionExtraParametersTreatments);
+        }
+    }
+
+    /**
+     * @return list<class-string<Model>>
+     */
+    private static function morphTypesHavingColumn(Model $model, MorphTo $relation, string $attribute): array
+    {
+        /** @var Collection<int, string|BackedEnum> $morph_types */
+        $morph_types = $model->newModelQuery()
+            ->distinct()
+            ->pluck($relation->getMorphType())
+            ->filter();
+
+        return $morph_types
+            ->map(function (string|BackedEnum $type) use ($attribute): ?string {
+                $type = $type instanceof BackedEnum ? (string) $type->value : $type;
+                $class = Relation::getMorphedModel($type) ?? Model::getActualClassNameForMorph($type);
+
+                return self::modelHasColumn($class, $attribute) ? $class : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private static function modelHasColumn(string $class, string $column): bool
+    {
+        if (! class_exists($class) || ! is_subclass_of($class, Model::class)) {
+            return false;
+        }
+
+        /** @var Model $model */
+        $model = new $class;
+
+        return $model->getConnection()->getSchemaBuilder()->hasColumn($model->getTable(), $column);
+    }
+
+    /**
      * Get the $model->$relation foreign key data.
+     *
+     * @return list<string>
      */
     private static function getForeignKeyData(Model $model, string $relation): array
     {
@@ -456,6 +869,9 @@ abstract class CrudRepository
 
     /**
      * Build the select required fomat and fields.
+     *
+     * @param  list<string>  $select_fields
+     * @return list<string>
      */
     private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
     {
