@@ -280,12 +280,9 @@ abstract class CrudRepository
             unset($params['select']);
         }
 
-        $with_constraints = [];
-        if ($with) {
-            $with_constraints = self::extractWithConstraints($params, $with);
-        }
-
         if ($with || $order_by || $select) {
+            $with_constraints = $with ? self::extractWithConstraints($params, $with) : [];
+
             self::handleWithOrderByAndSelect($clause, $with, $order_by, $select, $with_constraints);
         }
 
