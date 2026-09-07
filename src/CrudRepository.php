@@ -322,22 +322,22 @@ abstract class CrudRepository
             return;
         }
 
-        foreach ($struct['with'] as $relation => $config) {
+        foreach ($struct['with'] as $nested_relation => $config) {
             $parent_model_for_relation = $clause->getModel();
-            $relation_instance = self::getRelation($parent_model_for_relation, $relation);
+            $relation_instance = self::getRelation($parent_model_for_relation, $nested_relation);
 
             if ($relation_instance instanceof MorphTo) {
-                $clause->with($relation, function (MorphTo $query) use ($relation, $config, $clause): void {
+                $clause->with($nested_relation, function (MorphTo $query) use ($nested_relation, $config, $clause): void {
                     $parent_model = $clause->getModel();
-                    self::processMorphToWith($query, $config, $parent_model, $relation);
+                    self::processMorphToWith($query, $config, $parent_model, $nested_relation);
                 });
 
                 continue;
             }
 
-            $clause->with($relation, function ($query) use ($relation, $config, $clause): void {
+            $clause->with($nested_relation, function ($query) use ($nested_relation, $config, $clause): void {
                 $parent_model = $clause->getModel();
-                self::processParamsStructure($query, $config, $parent_model, $relation);
+                self::processParamsStructure($query, $config, $parent_model, $nested_relation);
             });
         }
     }
