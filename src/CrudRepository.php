@@ -384,8 +384,10 @@ abstract class CrudRepository
 
         /** @var array<class-string<Model>, array<string, \Closure(Relation): void>> $morph_with */
         $morph_with = [];
+
         foreach (array_keys($morph_to->getDictionary()) as $type) {
             $class = Model::getActualClassNameForMorph((string) $type);
+
             /** @var array<string, \Closure(Relation): void> $with_for_type */
             $with_for_type = [];
 
