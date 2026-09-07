@@ -246,9 +246,6 @@ abstract class CrudRepository
         return $model;
     }
 
-    /**
-     * Other private functions.
-     */
     protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
     {
         $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
@@ -293,9 +290,6 @@ abstract class CrudRepository
         self::applyRelationExistenceFilters($clause, $struct);
     }
 
-    /**
-     * Process the params structure.
-     */
     private static function processParamsStructure(Builder|Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
@@ -541,10 +535,7 @@ abstract class CrudRepository
         }
     }
 
-    /**
-     * @param  Builder|Relation  $clause
-     */
-    private static function applyEagerLoadConstraint($clause, string $attribute, mixed $val): void
+    private static function applyEagerLoadConstraint(Builder|Relation $clause, string $attribute, mixed $val): void
     {
         if ($val === null || $val === 'null') {
             $clause->whereNull($attribute);
@@ -605,14 +596,9 @@ abstract class CrudRepository
         $relation_instance = self::getRelation($model, $top_relation);
 
         if ($relation_instance instanceof MorphTo) {
-            $clause->whereHasMorph($top_relation, '*', function (Builder $query, string $type) use ($attribute, $val): void {
-                $class = Model::getActualClassNameForMorph($type);
-                if (! self::modelHasColumn($class, $attribute)) {
-                    $query->whereRaw('0 = 1');
+            $types = self::morphTypesHavingColumn($model, $relation_instance, $attribute);
 
-                    return;
-                }
-
+            $clause->whereHasMorph($top_relation, $types, function (Builder $query) use ($attribute, $val): void {
                 self::applyEagerLoadConstraint($query, $attribute, $val);
             });
 
@@ -631,10 +617,9 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  Builder  $clause
      * @param  array<string, mixed>  $struct
      */
-    private static function applyRelationExistenceFilters($clause, array $struct): void
+    private static function applyRelationExistenceFilters(Builder $clause, array $struct): void
     {
         foreach ($struct['with'] ?? [] as $relation => $config) {
             if (empty($config['constraints'])) {
@@ -681,6 +666,30 @@ abstract class CrudRepository
         if ($functionExtraParametersTreatments !== []) {
             $morph_to->constrain($functionExtraParametersTreatments);
         }
+    }
+
+    /**
+     * @return list<class-string<Model>>
+     */
+    private static function morphTypesHavingColumn(Model $model, MorphTo $relation, string $attribute): array
+    {
+        /** @var Collection<int, string|BackedEnum> $morph_types */
+        $morph_types = $model->newModelQuery()
+            ->distinct()
+            ->pluck($relation->getMorphType())
+            ->filter();
+
+        return $morph_types
+            ->map(function (string|BackedEnum $type) use ($attribute): ?string {
+                $type = $type instanceof BackedEnum ? (string) $type->value : $type;
+                $class = Relation::getMorphedModel($type) ?? Model::getActualClassNameForMorph($type);
+
+                return self::modelHasColumn($class, $attribute) ? $class : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private static function modelHasColumn(string $class, string $column): bool
