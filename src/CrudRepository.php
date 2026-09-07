@@ -586,7 +586,7 @@ abstract class CrudRepository
         $attribute = array_pop($parts);
         $relation = implode($separator, $parts);
 
-        if ($attribute === '' || $relation === '' || ! method_exists($model, explode('.', $relation)[0])) {
+        if ($attribute === '' || $relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null) {
             return null;
         }
 
@@ -619,7 +619,11 @@ abstract class CrudRepository
             return;
         }
 
-        $table = $relation_instance?->getRelated()->getTable() ?? $model->{$top_relation}()->getRelated()->getTable();
+        if ($relation_instance === null) {
+            return;
+        }
+
+        $table = $relation_instance->getRelated()->getTable();
 
         $clause->whereHas($relation, function (Builder $q) use ($attribute, $val, $table): void {
             self::applyEagerLoadConstraint($q, $table.'.'.$attribute, $val);
