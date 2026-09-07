@@ -42,6 +42,7 @@ abstract class CrudRepository
             // handling with, order_by and select
             $clause = self::getClause($params);
 
+            /** @var list<string>|null $searchable_fields */
             $searchable_fields = (new static::$model)->searchable;
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
@@ -75,6 +76,7 @@ abstract class CrudRepository
                 $functionExtraParametersTreatment($clause, $params);
             }
 
+            /** @var list<array<int, int|string|bool|null>> $whereClause */
             $whereClause = [];
 
             if (count($params) > 0) {
@@ -108,14 +110,12 @@ abstract class CrudRepository
             $clause = $clause->where($whereClause);
 
             // Process Scopes
-            if ($scopes !== null) {
-                $scopes = explode(',', $scopes);
-                foreach ($scopes as $scope) {
+            if (is_string($scopes)) {
+                foreach (explode(',', $scopes) as $scope) {
                     $scope_destruct = explode(':', $scope);
                     if (count($scope_destruct) > 0) {
                         $scope_method = array_shift($scope_destruct);
-                        $scope_params = $scope_destruct;
-                        $clause->{$scope_method}(...$scope_params);
+                        $clause->{$scope_method}(...$scope_destruct);
                     }
                 }
             }
@@ -301,7 +301,12 @@ abstract class CrudRepository
 
     /**
      * @param  array{
-     *     with?: array<string, array>,
+     *     with?: array<string, array{
+     *         with?: array<string, array<string, mixed>>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
      *     select?: list<string>,
      *     order_by?: array<string, string>,
      *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -351,6 +356,19 @@ abstract class CrudRepository
         }
     }
 
+    /**
+     * @param  array{
+     *     with?: array<string, array{
+     *         with?: array<string, array<string, mixed>>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
+     *     select?: list<string>,
+     *     order_by?: array<string, string>,
+     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     * }  $config
+     */
     private static function processMorphToWith(MorphTo $morph_to, array $config, Model $parent_model, string $relation): void
     {
         $nested_with = $config['with'] ?? [];
@@ -364,9 +382,11 @@ abstract class CrudRepository
             return;
         }
 
+        /** @var array<class-string<Model>, array<string, \Closure(Relation): void>> $morph_with */
         $morph_with = [];
         foreach (array_keys($morph_to->getDictionary()) as $type) {
             $class = Model::getActualClassNameForMorph((string) $type);
+            /** @var array<string, \Closure(Relation): void> $with_for_type */
             $with_for_type = [];
 
             foreach ($nested_with as $nested_relation => $nested_config) {
@@ -394,7 +414,12 @@ abstract class CrudRepository
      *
      * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
      * @return array{
-     *     with?: array<string, array>,
+     *     with?: array<string, array{
+     *         with?: array<string, array<string, mixed>>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
      *     select?: list<string>,
      *     order_by?: array<string, string>,
      *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -402,6 +427,7 @@ abstract class CrudRepository
      */
     private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, array $with_constraints = []): array
     {
+        /** @var array{with?: array<string, array{with?: array<string, array<string, mixed>>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>} $struct */
         $struct = [];
 
         if ($string_with) {
@@ -497,21 +523,27 @@ abstract class CrudRepository
      */
     private static function extractWithConstraints(array &$params, string $with): array
     {
+        /** @var array<string, true> $relation_paths */
         $relation_paths = [];
+
         foreach (explode(',', $with) as $segment) {
             $segment = trim($segment);
             if ($segment === '') {
                 continue;
             }
 
+            /** @var list<string> $current_path */
             $current_path = [];
+
             foreach (explode('..', $segment) as $relation) {
                 $current_path[] = $relation;
                 $relation_paths[implode('.', $current_path)] = true;
             }
         }
 
+        /** @var array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>> $constraints */
         $constraints = [];
+
         foreach ($params as $attr => $val) {
             if (! is_string($attr) || ! str_contains($attr, '.')) {
                 continue;
@@ -537,7 +569,12 @@ abstract class CrudRepository
 
     /**
      * @param  array{
-     *     with?: array<string, array>,
+     *     with?: array<string, array{
+     *         with?: array<string, array<string, mixed>>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
      *     select?: list<string>,
      *     order_by?: array<string, string>,
      *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -648,7 +685,12 @@ abstract class CrudRepository
 
     /**
      * @param  array{
-     *     with?: array<string, array>,
+     *     with?: array<string, array{
+     *         with?: array<string, array<string, mixed>>,
+     *         select?: list<string>,
+     *         order_by?: array<string, string>,
+     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
+     *     }>,
      *     select?: list<string>,
      *     order_by?: array<string, string>,
      *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
@@ -678,6 +720,7 @@ abstract class CrudRepository
             return;
         }
 
+        /** @var array<class-string<Model>, \Closure(Builder): void> $functionExtraParametersTreatments */
         $functionExtraParametersTreatments = [];
 
         foreach (array_keys($morph_to->getDictionary()) as $type) {
