@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespacedDto }};
+use Illuminate\Foundation\Http\FormRequest;
+
+final class {{ class }} extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return [
+        ];
+    }
+
+    public function dto(): {{ dto }}
+    {
+        return new {{ dto }};
+    }
+}

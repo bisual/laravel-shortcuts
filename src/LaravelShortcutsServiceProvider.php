@@ -2,7 +2,10 @@
 
 namespace Bisual\LaravelShortcuts;
 
-use Bisual\LaravelShortcuts\Commands\LaravelShortcutsCommand;
+use Bisual\LaravelShortcuts\Commands\BisualResourceMakeCommand;
+use Bisual\LaravelShortcuts\Commands\DtoMakeCommand;
+use Bisual\LaravelShortcuts\Commands\RepositoryMakeCommand;
+use Bisual\LaravelShortcuts\Commands\RequestDtoMakeCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -16,10 +19,12 @@ class LaravelShortcutsServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('laravel-shortcuts');
-        // ->hasConfigFile()
-        // ->hasViews()
-        // ->hasMigration('create_laravel-shortcuts_table')
-        // ->hasCommand(LaravelShortcutsCommand::class);
+            ->name('laravel-shortcuts')
+            ->hasCommands(
+                RepositoryMakeCommand::class,
+                DtoMakeCommand::class,
+                RequestDtoMakeCommand::class,
+                BisualResourceMakeCommand::class,
+            );
     }
 }
