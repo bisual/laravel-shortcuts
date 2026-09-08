@@ -16,14 +16,18 @@
         }
     ],
     "require": {
-        "php": "^8.4",
-        "illuminate/contracts": "^12.0",
+        "php": "^8.1",
+        "illuminate/contracts": "^13.0 | ^12.0 | ^11.0 | ^10.0 | ^9.0",
+        "ramsey/uuid": "^4.0",
         "spatie/laravel-package-tools": "^1.14.0"
     },
     "require-dev": {
-        "laravel/framework": "^12.0",
+        "larastan/larastan": "^3.0",
         "laravel/pint": "^1.0",
-        "rector/rector": "^2.0"
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "pestphp/pest": "^2.1|^3.0|^4.0",
+        "phpunit/phpunit": "^10.5|^11.5|^12.5",
+        "spatie/laravel-ray": "^1.26"
     },
     "autoload": {
         "psr-4": {
@@ -37,21 +41,27 @@
         }
     },
     "scripts": {
-        "format": "vendor/bin/pint",
-        "lint": [
-            "@composer format",
-            "@composer rector"
-        ],
-        "rector": "vendor/bin/rector process"
+        "post-autoload-dump": "@php ./vendor/bin/testbench package:discover --ansi",
+        "analyse": "vendor/bin/phpstan analyse",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "format": "vendor/bin/pint"
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
     },
     "extra": {
         "laravel": {
             "providers": [
                 "Bisual\\LaravelShortcuts\\LaravelShortcutsServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "LaravelShortcuts": "Bisual\\LaravelShortcuts\\Facades\\LaravelShortcuts"
+            }
         }
     },
     "minimum-stability": "stable",

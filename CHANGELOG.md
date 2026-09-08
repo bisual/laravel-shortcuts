@@ -2,6 +2,51 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.3.1 - 2026-06-10
+
+### What's Changed
+
+* BP1682 into main by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/16
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.3.0...v1.3.1
+
+## v1.3.0 - 2026-05-17
+
+### Added
+
+- Support for Laravel 13.
+
+### Changed
+
+- Updated CI matrix to test Laravel 10–13.
+- Migrated dev tooling to Larastan 3, Pest 4, and PHPUnit 12 for Laravel 13 compatibility.
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.2.0...v1.3.0
+
+## v1.2.0 - 2026-05-13
+
+### What's Changed
+
+* BP1418 into main by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/15
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.1.5...v1.2.0
+
+## v1.1.5 - 2026-03-02
+
+### What's Changed
+
+* BP1392 into main by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/14
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.1.4...v1.1.5
+
+## v1.1.4 - 2026-02-23
+
+### What's Changed
+
+* BP1342 into main by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/13
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.1.3...v1.1.4
+
 ## v1.1.3 - 2025-06-09
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.1.2...v1.1.3

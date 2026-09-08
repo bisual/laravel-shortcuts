@@ -4,28 +4,31 @@ declare(strict_types=1);
 
 namespace Bisual\LaravelShortcuts;
 
+use BackedEnum;
+use Bisual\LaravelShortcuts\Traits\HasUuid;
+use Carbon\Carbon;
 use Exception;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Stringable;
 
 abstract class CrudRepository
 {
-    public static string $model = Model::class;
+    public static $model = Model::class;
 
-    /*+
+    /*
      * @params
      *      - with
      *      - without
+     *      - append
      *      - ... other attributes to filter
      */
-    public static function index(array $params = [], bool $paginate = false, ?callable $callback = null): LengthAwarePaginator|Collection
+    public static function index(array $params = [], bool $paginate = false, $functionExtraParametersTreatment = null)
     {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
@@ -70,28 +73,28 @@ abstract class CrudRepository
                 unset($params['append']);
             }
 
-            if (is_callable($callback)) {
-                $callback($clause, $params);
+            // Extra parameters treatment
+            if ($functionExtraParametersTreatment !== null) {
+                $functionExtraParametersTreatment($clause, $params);
             }
 
             $whereClause = [];
             if (count($params) > 0) {
-                $record = (new static::$model);
-
+                $model_inst = (new static::$model);
                 foreach ($params as $attr => $val) {
                     if ($val !== null && $val !== '') {
-                        if (str($attr)->contains('-')) {
-                            $separate = explode('-', (string) $attr);
+                        if (str_contains($attr, '-')) {
+                            $separate = explode('-', $attr);
                             $relations = implode('-', array_slice($separate, 0, -1));
                             $attribute = $separate[count($separate) - 1];
                             $table = (new static::$model)->{$relations}()->getRelated()->getTable();
-                            $clause->whereHas($relations, function (mixed $q) use ($attribute, $val, $table): void {
+                            $clause->whereHas($relations, function ($q) use (&$attribute, &$val, &$table, &$model_inst): void {
                                 if ($val === null || $val === 'null') {
                                     $q->whereNull($table.'.'.$attribute);
                                 } elseif ($val === 'notnull') {
                                     $q->whereNotNull($table.'.'.$attribute);
-                                } elseif (str($val)->contains(',')) {
-                                    $q->whereIn($table.'.'.$attribute, explode(',', (string) $val));
+                                } elseif (str_contains($val, ',')) {
+                                    $q->whereIn($table.'.'.$attribute, explode(',', $val));
                                 } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                                     $q->where($table.'.'.$attribute, $val);
                                 } else {
@@ -102,11 +105,13 @@ abstract class CrudRepository
                             $whereClause[] = [$attr, null]; // $q->whereNull($attribute);
                         } elseif ($val === 'notnull') {
                             $clause->whereNotNull($attr);
-                        } elseif (str($val)->contains(',')) {
-                            $clause->whereIn($attr, explode(',', (string) $val));
+                        } elseif ($val instanceof BackedEnum) {
+                            $clause->where($attr, $val);
+                        } elseif (str_contains((string) $val, ',')) {
+                            $clause->whereIn($attr, explode(',', $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                             $whereClause[] = [$attr, $val];
-                        } elseif ($record->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
+                        } elseif ($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
                             $clause->whereDate($attr, Carbon::parse($val));
                         } else {
                             $whereClause[] = [$attr, 'like', "%{$val}%"];
@@ -132,23 +137,23 @@ abstract class CrudRepository
 
             // Process Without
             if ($without) {
-                foreach (explode(',', (string) $without) as $w) {
+                foreach (explode(',', $without) as $w) {
                     $clause->without($w);
                 }
             }
 
             // Process Searchable Fields
             if ($search) {
-                $clause->where(function (mixed $query) use ($searchable_fields, $search): void {
+                $clause->where(function ($query) use (&$searchable_fields, &$search): void {
                     foreach ($searchable_fields as $idx => $search_field) {
                         $parts = explode('.', $search_field);
                         if (count($parts) === 2) {
                             if ($idx === 0) {
-                                $query->whereHas($parts[0], function (mixed $query) use ($parts, $search): void {
+                                $query->whereHas($parts[0], function ($query) use (&$parts, &$search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             } else {
-                                $query->orWhereHas($parts[0], function (mixed $query) use ($parts, $search): void {
+                                $query->orWhereHas($parts[0], function ($query) use (&$parts, &$search): void {
                                     $query->where($parts[1], 'like', "%{$search}%");
                                 });
                             }
@@ -161,106 +166,105 @@ abstract class CrudRepository
                 });
             }
 
-            $records = $clause
-                ->when($paginate, function (mixed $query) use ($perPage, $page): LengthAwarePaginator {
-                    return $query->paginate($perPage, ['*'], 'page', $page);
-                })
-                ->when(! $paginate && $limit, function (mixed $query) use ($limit): mixed {
-                    return $query->limit($limit);
-                })
-                ->when(! $paginate && ! $limit, function (mixed $query): mixed {
-                    return $query->get();
-                });
+            if ($paginate) {
+                $data = $clause->paginate($perPage, ['*'], 'page', $page);
+            } else {
+                if ($limit) {
+                    $clause->limit($limit);
+                }
+                $data = $clause->get();
+            }
 
             if ($append !== null) {
-                foreach ($records as $record) {
-                    foreach (explode(',', $append) as $append_item) {
-                        $record->append($append_item);
+                foreach ($data as $record) {
+                    foreach (str($append)->explode(',') as $append_item) {
+                        self::appendAttribute($record, str($append_item)->trim());
                     }
                 }
             }
 
-            return $records;
-        }
-
-        if (is_callable($callback)) {
+            return $data;
+        } elseif ($functionExtraParametersTreatment !== null) {
             $clause = (static::$model)::query();
-
-            if (is_callable($callback)) {
-                $callback($clause, $params);
+            if ($functionExtraParametersTreatment !== null) {
+                $functionExtraParametersTreatment($clause, $params);
             }
 
-            return $paginate
-                ? $clause->paginate($perPage, ['*'], 'page', $page)
-                : $clause->get();
+            return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
 
-        return $paginate
-            ? (static::$model)::query()->paginate($perPage, ['*'], 'page', $page)
-            : (static::$model)::query()->get();
+        return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
     }
 
-    public static function show(int|string|Model $id, array $params = [], ?callable $callback = null, bool $withoutGlobalScopes = false): Model
+    public static function show($id, array $params = [], $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
     {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
 
-        if (is_callable($callback)) {
-            $callback($clause, $params);
+        if ($functionExtraParametersTreatment !== null) {
+            $functionExtraParametersTreatment($clause, $params);
         }
 
-        $idIsModel = $id instanceof Model && $id::class === static::$model;
-
-        if ($idIsModel) {
+        if ($id instanceof static::$model) {
             return $id;
+        } // ja li hem passat el model
+        elseif (is_object($id)) {
+            $id = $id->id;
+        } // per si li hem passat algun altre objecte
+        elseif (is_array($id)) {
+            $id = $id['id'];
+        } // per si li hem passat en array
+
+        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
+            $clause->byUUID($id);
+        } else {
+            $clause->where(App::make(static::$model)->getKeyName(), $id);
         }
 
-        $clause->where((new static::$model)->getKeyName(), $id);
-
-        $record = $clause->firstOrFail();
+        $model = $clause->sole();
 
         if (isset($params['append']) && $params['append'] !== '') {
-            foreach (explode(',', (string) $params['append']) as $append) {
-                $record->append($append);
+            foreach (explode(',', $params['append']) as $append) {
+                $model->append($append);
             }
         }
 
-        return $record;
+        return $model;
     }
 
-    public static function store(array $data): Model
+    public static function store(array $data)
     {
-        return (static::$model)::query()->create($data);
+        return (static::$model)::create($data);
     }
 
-    public static function update(int|string|Model $id, array $data): Model
+    public static function update($model, $params)
     {
-        $record = self::show($id);
+        $model = self::show($model);
 
-        $record->update($data);
+        $model->update($params);
 
-        return $record->fresh();
+        return $model->fresh();
     }
 
-    public static function destroy(int|string|Model $record, ?callable $callback = null): Model
+    public static function destroy($model, $functionExtraParametersTreatment = null)
     {
-        $record = self::show($record);
+        $model = self::show($model);
 
-        if (is_callable($callback)) {
-            $callback($record->id);
+        if ($functionExtraParametersTreatment !== null) {
+            $functionExtraParametersTreatment($model->id);
         }
 
-        $record->delete();
+        $model->delete();
 
-        return $record;
+        return $model;
     }
 
-    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): mixed
+    /**
+     * Other private functions.
+     */
+    protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false)
     {
-        $query = (static::$model)::query()
-            ->when($withoutGlobalScopes, function (mixed $q): mixed {
-                return $q->withoutGlobalScopes();
-            });
+        $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
 
         // With
         $with = null;
@@ -284,19 +288,24 @@ abstract class CrudRepository
         }
 
         if ($with || $order_by || $select) {
-            self::handleWithOrderByAndSelect($query, $with, $order_by, $select);
+            self::handleWithOrderByAndSelect($clause, $with, $order_by, $select);
         }
 
-        return $query;
+        return $clause;
     }
 
-    private static function handleWithOrderByAndSelect(mixed &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null): void
+    private static function handleWithOrderByAndSelect(&$clause, ?string $with = null, ?string $order_by = null, ?string $select = null): void
     {
         $struct = self::getParamsStructure($with, $order_by, $select); // we generate the structure with the data that we receive
         self::processParamsStructure($clause, $struct);
     }
 
-    private static function processParamsStructure(mixed &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    /**
+     * Process the params structure.
+     *
+     * @param [type] $clause
+     */
+    private static function processParamsStructure(&$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
         if (! empty($struct['select'])) {
@@ -316,7 +325,7 @@ abstract class CrudRepository
         }
 
         foreach ($struct['with'] as $relation => $config) {
-            $clause->with($relation, function (mixed $query) use ($relation, $config, $clause): void {
+            $clause->with($relation, function ($query) use ($relation, $config, $clause): void {
                 $parent_model = $clause->getModel(); // get the parent model
                 self::processParamsStructure($query, $config, $parent_model, $relation);
             });
@@ -348,7 +357,7 @@ abstract class CrudRepository
             // process $string_order_by
             foreach (explode(',', $string_order_by) as $order_by_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (str($order_by_segment)->doesntContain('.')) {
+                if (! str_contains($order_by_segment, '.')) {
                     $current = &$struct;
                     $parts = explode(':', $order_by_segment);
                     $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
@@ -358,7 +367,7 @@ abstract class CrudRepository
                 } else {
                     $current = &$struct['with'];
                     foreach (explode('..', $order_by_segment) as $relation_path) {
-                        if (str($relation_path)->contains('.')) {
+                        if (str_contains($relation_path, '.')) {
                             $parts = explode(':', $relation_path);
                             $order_by_direction = (count($parts) === 2) ? array_pop($parts) : 'asc';
                             [$key, $order_by] = explode('.', $parts[0], 2);
@@ -385,13 +394,13 @@ abstract class CrudRepository
             // process $string_select
             foreach (explode(',', $string_select) as $select_segment) {
                 // if it doesn't have '..', we are on the main table
-                if (str($select_segment)->doesntContain('.')) {
+                if (! str_contains($select_segment, '.')) {
                     $current = &$struct;
                     $current['select'] = explode('|', $select_segment);
                 } else {
                     $current = &$struct['with'];
                     foreach (explode('..', $select_segment) as $relation_path) {
-                        if (str($relation_path)->contains('.')) {
+                        if (str_contains($relation_path, '.')) {
                             [$key, $select] = explode('.', $relation_path, 2);
                             if (! array_key_exists($key, $current)) {
                                 throw new Exception("You can't select field that are not in the relation.");
@@ -413,16 +422,19 @@ abstract class CrudRepository
         return $struct;
     }
 
-    private static function getForeignKeyData(Model $record, string $relation): array
+    /**
+     * Get the $model->$relation foreign key data.
+     */
+    private static function getForeignKeyData(Model $model, string $relation): array
     {
-        if (! method_exists($record, $relation)) {
-            throw new Exception("Relation '{$relation}' not found in model ".$record::class);
+        if (! method_exists($model, $relation)) {
+            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
         }
 
-        $relation_instance = $record->{$relation}();
+        $relation_instance = $model->{$relation}();
 
         if (! $relation_instance instanceof Relation) {
-            throw new Exception("Relation '{$relation}' not found in model ".$record::class);
+            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
         }
 
         if ($relation_instance instanceof MorphTo
@@ -445,13 +457,52 @@ abstract class CrudRepository
     /**
      * Build the select required fomat and fields.
      */
-    private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_record = null, ?string $relation = null): array
+    private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
     {
-        return collect(['id'])
-            ->concat($select_fields)
-            ->concat($parent_record && $relation ? self::getForeignKeyData($parent_record, $relation) : [])
-            ->unique()
-            ->values()
-            ->all();
+        return array_unique(array_merge( // array_unique if we get the id from the front
+            ['id'],
+            $select_fields,
+            $parent_model && $relation ? self::getForeignKeyData($parent_model, $relation) : []
+        ));
+    }
+
+    private static function appendAttribute(Model $record, Stringable $append): void
+    {
+        $is_appending_main_model = $append->doesntContain('.');
+
+        if ($is_appending_main_model) {
+            $attributes = $append;
+
+            $record->append($attributes->toString());
+
+            return;
+        }
+
+        $relationship_names = $append->explode('.');
+
+        $relationship_attributes = $relationship_names->pop();
+
+        $current_record = $record;
+
+        foreach ($relationship_names as $relationship_name) {
+            if (! $current_record->relationLoaded($relationship_name)) {
+                throw new Exception("Relation '{$relationship_name}' not loaded in model ".$record::class." when appending attribute '{$append}'. Load it using the 'with' parameter.");
+            }
+
+            /** @var Model|null|Collection<int, Model> $current_record */
+            $current_record = $current_record->getRelation($relationship_name);
+        }
+
+        if ($current_record instanceof Model) {
+            $current_record->append($relationship_attributes);
+
+            return;
+        }
+
+        if ($current_record instanceof Collection) {
+            $current_record->each(function (Model $related_model) use ($relationship_attributes): void {
+                $related_model->append($relationship_attributes);
+            });
+        }
     }
 }

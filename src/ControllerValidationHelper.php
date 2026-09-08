@@ -1,12 +1,10 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Bisual\LaravelShortcuts;
 
-final class ControllerValidationHelper
+class ControllerValidationHelper
 {
-    private static array $defaultValidationParameters = [
+    private static $defaultValidationParameters = [
         'search' => 'string|nullable',
         'with' => 'string',
         'without' => 'string',
@@ -18,7 +16,7 @@ final class ControllerValidationHelper
         'scopes' => 'string',
     ];
 
-    public static function indexQueryParametersValidation(array $params = []): array
+    public static function indexQueryParametersValidation(array $params = [])
     {
         return array_merge(self::$defaultValidationParameters, $params);
     }
