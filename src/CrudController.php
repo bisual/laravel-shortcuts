@@ -36,7 +36,7 @@ abstract class CrudController extends BaseController
 
     public static $updateRequestClass = Request::class; // pot ser un array de validacions també
 
-    public function index(Request $request, $functionExtraParametersTreatment = null)
+    public function index(Request $request, $callback = null)
     {
         if (static::$authorize['index']) {
             $this->authorize('viewAny', [static::$model, $request->query()]);
@@ -50,8 +50,8 @@ abstract class CrudController extends BaseController
             $params = $request->query();
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($params);
+        if ($callback !== null) {
+            $callback($params);
         }
 
         return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
@@ -67,7 +67,7 @@ abstract class CrudController extends BaseController
         return response()->json($item);
     }
 
-    public function store(Request $request, $functionExtraParametersTreatment = null)
+    public function store(Request $request, $callback = null)
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
@@ -81,14 +81,14 @@ abstract class CrudController extends BaseController
             $this->authorize('create', [static::$model, $data]);
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($data);
+        if ($callback !== null) {
+            $callback($data);
         }
 
         return response()->json((static::$repository)::store($data));
     }
 
-    public function update(Request $request, $id, $functionExtraParametersTreatment = null)
+    public function update(Request $request, $id, $callback = null)
     {
         $item = (static::$repository)::show($id);
 
@@ -104,22 +104,22 @@ abstract class CrudController extends BaseController
             $this->authorize('update', [$item, $data]);
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($item, $data);
+        if ($callback !== null) {
+            $callback($item, $data);
         }
 
         return response()->json((static::$repository)::update($item, $data));
     }
 
-    public function destroy(Request $request, $id, $functionExtraParametersTreatment = null)
+    public function destroy(Request $request, $id, $callback = null)
     {
         $item = (static::$repository)::show($id);
         if (static::$authorize['destroy']) {
             $this->authorize('delete', $item);
         }
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($item);
+        if ($callback !== null) {
+            $callback($item);
         }
 
         return response()->json((static::$repository)::destroy($item));
