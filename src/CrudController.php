@@ -9,17 +9,25 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Validator;
 
+/**
+ * @template TModel of Model
+ * @template TRepository of CrudRepository<TModel>
+ */
 abstract class CrudController extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
+    /** @var class-string<TRepository> */
     public static $repository = CrudRepository::class;
 
+    /** @var class-string<TModel> */
     public static $model = Model::class;
 
     public static array $authorize = [
@@ -36,7 +44,7 @@ abstract class CrudController extends BaseController
 
     public static $updateRequestClass = Request::class; // pot ser un array de validacions també
 
-    public function index(Request $request, $callback = null)
+    public function index(Request $request, ?callable $callback = null): AnonymousResourceCollection
     {
         if (static::$authorize['index']) {
             $this->authorize('viewAny', [static::$model, $request->query()]);
@@ -57,9 +65,10 @@ abstract class CrudController extends BaseController
         return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
     }
 
-    public function show(Request $request, $id)
+    public function show(Request $request, int|string $id): JsonResponse
     {
         $item = static::$repository::show($id, $request->query());
+
         if (static::$authorize['show']) {
             $this->authorize('view', $item);
         }
@@ -67,7 +76,7 @@ abstract class CrudController extends BaseController
         return response()->json($item);
     }
 
-    public function store(Request $request, $callback = null)
+    public function store(Request $request, ?callable $callback = null): JsonResponse
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
@@ -88,7 +97,7 @@ abstract class CrudController extends BaseController
         return response()->json((static::$repository)::store($data));
     }
 
-    public function update(Request $request, $id, $callback = null)
+    public function update(Request $request, int|string $id, ?callable $callback = null): JsonResponse
     {
         $item = (static::$repository)::show($id);
 
@@ -111,9 +120,10 @@ abstract class CrudController extends BaseController
         return response()->json((static::$repository)::update($item, $data));
     }
 
-    public function destroy(Request $request, $id, $callback = null)
+    public function destroy(Request $request, int|string $id, ?callable $callback = null): JsonResponse
     {
         $item = (static::$repository)::show($id);
+
         if (static::$authorize['destroy']) {
             $this->authorize('delete', $item);
         }

@@ -14,18 +14,24 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Stringable;
 
+/**
+ * @template TModel of Model
+ */
 abstract class CrudRepository
 {
+    /** @var class-string<TModel> */
     public static $model = Model::class;
 
     /**
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return LengthAwarePaginator<int, TModel>|Collection<int, TModel>
      */
-    public static function index(array $params = [], bool $paginate = false, ?callable $callback = null)
+    public static function index(array $params = [], bool $paginate = false, ?callable $callback = null): LengthAwarePaginator|Collection
     {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
@@ -177,14 +183,17 @@ abstract class CrudRepository
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
 
-        return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
+        return $paginate
+            ? (static::$model)::query()->paginate($perPage, ['*'], 'page', $page)
+            : (static::$model)::query()->get();
     }
 
     /**
      * @param  int|string|array<string, int|string>|object  $id
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return TModel
      */
-    public static function show(int|string|array|object $id, array $params = [], ?callable $callback = null, bool $withoutGlobalScopes = false)
+    public static function show(int|string|array|object $id, array $params = [], ?callable $callback = null, bool $withoutGlobalScopes = false): Model
     {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
@@ -220,27 +229,32 @@ abstract class CrudRepository
         return $model;
     }
 
-    public static function store(array $data)
+    /**
+     * @return TModel
+     */
+    public static function store(array $data): Model
     {
-        return (static::$model)::create($data);
+        return (static::$model)::query()->create($data);
     }
 
     /**
      * @param  int|string|array<string, int|string>|object  $model
+     * @return TModel
      */
-    public static function update(int|string|array|object $model, array $params)
+    public static function update(int|string|array|object $model, array $params): Model
     {
         $model = self::show($model);
 
         $model->update($params);
 
-        return $model->fresh();
+        return $model->refresh();
     }
 
     /**
      * @param  int|string|array<string, int|string>|object  $model
+     * @return TModel
      */
-    public static function destroy(int|string|array|object $model, ?callable $callback = null)
+    public static function destroy(int|string|array|object $model, ?callable $callback = null): Model
     {
         $model = self::show($model);
 
@@ -255,10 +269,13 @@ abstract class CrudRepository
 
     /**
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return Builder<TModel>
      */
     protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): Builder
     {
-        $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
+        $clause = $withoutGlobalScopes
+            ? (static::$model)::query()->withoutGlobalScopes()
+            : (static::$model)::query();
 
         // With
         $with = null;
