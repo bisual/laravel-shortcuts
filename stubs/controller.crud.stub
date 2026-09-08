@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+{{ requestImports }}use {{ namespacedModel }};
+use {{ namespacedRepository }};
+use Bisual\LaravelShortcuts\CrudController;
+
+/**
+ * @extends CrudController<{{ model }}, {{ repository }}>
+ */
+final class {{ class }} extends CrudController
+{
+    public static $repository = {{ repository }}::class;
+
+    public static $model = {{ model }}::class;
+
+    public static $storeRequestClass = {{ storeRequestClass }};
+
+    public static $updateRequestClass = {{ updateRequestClass }};
+}

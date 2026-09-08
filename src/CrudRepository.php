@@ -14,18 +14,24 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Stringable;
 
+/**
+ * @template TModel of Model
+ */
 abstract class CrudRepository
 {
+    /** @var class-string<TModel> */
     public static $model = Model::class;
 
     /**
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return LengthAwarePaginator<int, TModel>|Collection<int, TModel>
      */
-    public static function index(array $params = [], bool $paginate = false, ?callable $functionExtraParametersTreatment = null)
+    public static function index(array $params = [], bool $paginate = false, ?callable $callback = null): LengthAwarePaginator|Collection
     {
         $perPage = $params['per_page'] ?? 15; // Obtener el número de elementos por página, predeterminado a 15
         unset($params['per_page']);
@@ -44,7 +50,7 @@ abstract class CrudRepository
 
             /** @var list<string>|null $searchable_fields */
             $searchable_fields = (new static::$model)->searchable;
-            
+
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
                 $search = $params['search'];
@@ -73,8 +79,8 @@ abstract class CrudRepository
             }
 
             // Extra parameters treatment
-            if (is_callable($functionExtraParametersTreatment)) {
-                $functionExtraParametersTreatment($clause, $params);
+            if (is_callable($callback)) {
+                $callback($clause, $params);
             }
 
             /** @var list<array<int, int|string|bool|null>> $whereClause */
@@ -170,27 +176,30 @@ abstract class CrudRepository
             }
 
             return $data;
-        } elseif (is_callable($functionExtraParametersTreatment)) {
+        } elseif (is_callable($callback)) {
             $clause = (static::$model)::query();
-            $functionExtraParametersTreatment($clause, $params);
+            $callback($clause, $params);
 
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
 
-        return $paginate ? (static::$model)::paginate($perPage, ['*'], 'page', $page) : (static::$model)::get();
+        return $paginate
+            ? (static::$model)::query()->paginate($perPage, ['*'], 'page', $page)
+            : (static::$model)::query()->get();
     }
 
     /**
      * @param  int|string|array<string, int|string>|object  $id
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return TModel
      */
-    public static function show(int|string|array|object $id, array $params = [], ?callable $functionExtraParametersTreatment = null, bool $withoutGlobalScopes = false)
+    public static function show(int|string|array|object $id, array $params = [], ?callable $callback = null, bool $withoutGlobalScopes = false): Model
     {
         // handling with, order_by and select
         $clause = self::getClause($params, $withoutGlobalScopes);
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($clause, $params);
+        if ($callback !== null) {
+            $callback($clause, $params);
         }
 
         if ($id instanceof static::$model) {
@@ -220,32 +229,37 @@ abstract class CrudRepository
         return $model;
     }
 
-    public static function store(array $data)
+    /**
+     * @return TModel
+     */
+    public static function store(array $data): Model
     {
-        return (static::$model)::create($data);
+        return (static::$model)::query()->create($data);
     }
 
     /**
      * @param  int|string|array<string, int|string>|object  $model
+     * @return TModel
      */
-    public static function update(int|string|array|object $model, array $params)
+    public static function update(int|string|array|object $model, array $params): Model
     {
         $model = self::show($model);
 
         $model->update($params);
 
-        return $model->fresh();
+        return $model->refresh();
     }
 
     /**
      * @param  int|string|array<string, int|string>|object  $model
+     * @return TModel
      */
-    public static function destroy(int|string|array|object $model, ?callable $functionExtraParametersTreatment = null)
+    public static function destroy(int|string|array|object $model, ?callable $callback = null): Model
     {
         $model = self::show($model);
 
-        if ($functionExtraParametersTreatment !== null) {
-            $functionExtraParametersTreatment($model->id);
+        if ($callback !== null) {
+            $callback($model->id);
         }
 
         $model->delete();
@@ -255,10 +269,13 @@ abstract class CrudRepository
 
     /**
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
+     * @return Builder<TModel>
      */
     protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): Builder
     {
-        $clause = $withoutGlobalScopes ? (static::$model)::withoutGlobalScopes() : (static::$model)::query();
+        $clause = $withoutGlobalScopes
+            ? (static::$model)::query()->withoutGlobalScopes()
+            : (static::$model)::query();
 
         // With
         $with = null;
@@ -770,8 +787,8 @@ abstract class CrudRepository
             return;
         }
 
-        /** @var array<class-string<Model>, \Closure(Builder): void> $functionExtraParametersTreatments */
-        $functionExtraParametersTreatments = [];
+        /** @var array<class-string<Model>, \Closure(Builder): void> $callbacks */
+        $callbacks = [];
 
         foreach (array_keys($morph_to->getDictionary()) as $type) {
             $class = Model::getActualClassNameForMorph((string) $type);
@@ -785,15 +802,15 @@ abstract class CrudRepository
                 continue;
             }
 
-            $functionExtraParametersTreatments[$class] = function (Builder $query) use ($applicable): void {
+            $callbacks[$class] = function (Builder $query) use ($applicable): void {
                 foreach ($applicable as $constraint) {
                     self::applyEagerLoadConstraint($query, $constraint['attribute'], $constraint['value']);
                 }
             };
         }
 
-        if ($functionExtraParametersTreatments !== []) {
-            $morph_to->constrain($functionExtraParametersTreatments);
+        if ($callbacks !== []) {
+            $morph_to->constrain($callbacks);
         }
     }
 
