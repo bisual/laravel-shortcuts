@@ -23,7 +23,5 @@ class Helper
 
             return $matches[0];
         }, $template);
-
-        return $template;
     }
 }
