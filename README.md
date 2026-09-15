@@ -41,6 +41,69 @@ Optionally, you can publish the views using
 php artisan vendor:publish --tag="laravel-shortcuts-views"
 ```
 
+## Artisan generators
+
+The package registers generators for repositories, DTOs, form requests, and a resource bundle. Generated PHP lives under the usual Laravel `App\` namespaces. Controllers go to `App\Http\Controllers\API`.
+
+### `make:repository`
+
+Creates a class in `app/Repositories`. The `Repository` suffix is added if you omit it.
+
+```bash
+php artisan make:repository Post
+php artisan make:repository Post --model=Post
+```
+
+Without `--model`, you get an empty `final` class. With `--model=Post` (or `App\Models\Post`), the class extends `CrudRepository`, sets `$model`, and includes `@extends CrudRepository<Post>`.
+
+### `make:dto`
+
+Creates a `final readonly` class in `app/DTOs`. The name is normalized to a `DTO` suffix (`RegisterUser` and `RegisterUserDTO` both become `RegisterUserDTO`).
+
+```bash
+php artisan make:dto RegisterUser
+```
+
+### `make:request-dto`
+
+Creates a matching DTO and a form request in `app/Http/Requests`. `RegisterUser` yields `RegisterUserDTO` plus `RegisterUserRequest` with empty `rules()`, `authorize(): true`, and a `dto()` method.
+
+```bash
+php artisan make:request-dto RegisterUser
+```
+
+### `make:bisual-resource`
+
+Scaffolds an Eloquent model and optional companions. The name is the model (`Post`). If the model already exists, the command fails.
+
+```bash
+php artisan make:bisual-resource Post -crfspd
+```
+
+If you omit the name or flags, Laravel Prompts asks for the model name and which components to generate.
+
+| Flag | Long name | Generates |
+| --- | --- | --- |
+| `-c` | `--controller` | `App\Http\Controllers\API\PostController` extending `CrudController` |
+| `-r` | `--repository` | `PostRepository` bound to `Post` |
+| `-f` | `--factory` | Laravel factory |
+| `-s` | `--seeder` | Laravel seeder |
+| `-p` | `--policy` | Laravel policy for the model |
+| `-d` | `--dto` | `StorePostDTO` and `UpdatePostDTO` |
+| `-m` | `--migration` | Laravel migration |
+| `-a` | `--all` | All of the above |
+
+Factory, seeder, policy, migration, and the model itself are delegated to Laravel's `make:*` commands.
+
+When `-c` and `-d` are used together, the command also runs `make:request-dto` for `StorePost` and `UpdatePost`, and the controller wires:
+
+```php
+public static $storeRequestClass = StorePostRequest::class;
+public static $updateRequestClass = UpdatePostRequest::class;
+```
+
+With `-c` and no `-d`, those properties are empty arrays (a minimal CRUD controller). Routes are not registered automatically.
+
 ## Custom query params usage
 
 You can build different formats of query params to handle sort, select and with in different depths of your query.
