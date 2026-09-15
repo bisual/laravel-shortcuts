@@ -156,7 +156,7 @@ When the condition targets a relation, append a filter type (default is `parent`
 ?where=comments.content[like]<{deadlock%}>::parent||tags.name[=]<{urgent}>::child
 ```
 
-Separators are ignored when they appear inside `<{ }>`, so values may contain `,`, `||`, `&&` or `::` safely.
+Separators are ignored when they appear inside `<{ }>` or `[ ]`, so values and operators may contain `,`, `||`, `&&` or `::` safely (e.g. `created_at[date,>=]<{2024-01-01}>`).
 
 #### ⚙️ Generalities
 
