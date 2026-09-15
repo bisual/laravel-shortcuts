@@ -84,6 +84,31 @@ And once again, you can choose what information about your relationship you rece
 ?select=relation..relation2..relation3.name|description
 ```
 
+#### -- FILTER BY RELATION ATTRIBUTE --
+
+You can filter parent rows by an attribute of a related model. The same value rules as for normal attribute filters apply (`null`, `notnull`, enums, comma-separated lists, booleans, numeric equality, or `LIKE` for strings).
+
+```bash
+# HTTP query string — use "-" (PHP turns "." into "_" in query keys)
+?records-is_archived=false
+
+# PHP / tinker / arrays — use "."
+YourRepository::index(params: [
+    'author.company_id' => 1,
+]);
+```
+
+- `.` — programmatic params (`author.name`, `records.is_archived`)
+- `-` — HTTP query keys (`author-name`, `records-is_archived`)
+
+BelongsTo / HasMany / similar relations use `whereHas`. MorphTo relations use `whereHasMorph` and only query morph types that actually have that column.
+
+When you also pass `with=relation` and use the `.` form (`relation.attribute=value`), the constraint is applied both to parent existence and to the eager-loaded relation. The `-` form still filters parents, but does not constrain the eager load.
+
+```bash
+?with=author&author.company_id=1
+```
+
 #### ⚙️ Generalities
 
 In all cases, to separate different relationships, regardless of the depth level, they must be separated by a ','.
