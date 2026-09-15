@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Bisual\LaravelShortcuts;
 
 use BackedEnum;
-use Bisual\LaravelShortcuts\Enums\FilterType;
+use Bisual\LaravelShortcuts\Enums\QueryRelationFilterTypeEnum;
+use Bisual\LaravelShortcuts\Helpers\QueryParamsStringDelimitersHelper;
+use Bisual\LaravelShortcuts\Helpers\QueryParamsStructureHelper;
 use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
 use Closure;
@@ -398,11 +400,11 @@ abstract class CrudRepository
 
         if ($string_where) {
             // process $string_where
-            foreach (StringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) {
+            foreach (QueryParamsStringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) {
                 // Default del bloque (sufijo ::parent|child|both al final del segmento)
-                $default_filter_type = self::getFilterType($where_segment);
+                $default_relation_filter_mode = self::getQueryRelationFilterType($where_segment);
 
-                $or_conditions = StringDelimitersHelper::explodeOutsideRanges('||', $where_segment);
+                $or_conditions = QueryParamsStringDelimitersHelper::explodeOutsideRanges('||', $where_segment);
 
                 if (count($or_conditions) > 1) {
                     $condition_group = [
@@ -412,15 +414,15 @@ abstract class CrudRepository
 
                     foreach ($or_conditions as $or_condition) {
                         $condition_group['groups'][] = [
-                            'conditions' => self::parseAndConditions($or_condition, $default_filter_type),
+                            'conditions' => self::parseAndConditions($or_condition, $default_relation_filter_mode),
                         ];
                     }
 
                     $struct['where_conditions'][] = $condition_group;
                 } else {
-                    foreach (self::parseAndConditions($where_segment, $default_filter_type) as $condition) {
+                    foreach (self::parseAndConditions($where_segment, $default_relation_filter_mode) as $condition) {
                         $struct['where_conditions'][] = [
-                            'filter_type' => $condition['filter_type'],
+                            'relation_filter_mode' => $condition['relation_filter_mode'],
                             'condition' => $condition,
                         ];
                     }
@@ -434,41 +436,41 @@ abstract class CrudRepository
     /**
      * Extract group-level ::parent|child|both default from a where segment.
      */
-    private static function getFilterType(string &$where_segment): FilterType
+    private static function getQueryRelationFilterType(string &$where_segment): QueryRelationFilterTypeEnum
     {
-        $parts = StringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
+        $parts = QueryParamsStringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
 
         if (count($parts) === 1) {
-            return FilterType::Parent;
+            return QueryRelationFilterTypeEnum::Parent;
         }
 
         $maybe_type = $parts[count($parts) - 1];
-        $valid = array_column(FilterType::cases(), 'value');
+        $valid = array_column(QueryRelationFilterTypeEnum::cases(), 'value');
 
         if (! in_array($maybe_type, $valid, true)) {
-            return FilterType::Parent;
+            return QueryRelationFilterTypeEnum::Parent;
         }
 
         array_pop($parts);
         $where_segment = implode('::', $parts);
 
-        return FilterType::from($maybe_type);
+        return QueryRelationFilterTypeEnum::from($maybe_type);
     }
 
     /**
      * Split a segment by && into condition arrays.
      * Each condition may override the default filter type with ::parent|child|both.
      *
-     * @return array<int, array{key: string, operator: string, value: string, path: ?string, filter_type: FilterType}>
+     * @return array<int, array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}>
      */
-    private static function parseAndConditions(string $segment, FilterType $default_filter_type = FilterType::Parent): array
+    private static function parseAndConditions(string $segment, QueryRelationFilterTypeEnum $default_relation_filter_mode = QueryRelationFilterTypeEnum::Parent): array
     {
-        $parts = StringDelimitersHelper::explodeOutsideRanges('&&', $segment);
+        $parts = QueryParamsStringDelimitersHelper::explodeOutsideRanges('&&', $segment);
 
-        return array_map(function (string $condition) use ($default_filter_type): array {
-            $filter_type = self::extractConditionFilterType($condition, $default_filter_type);
-            $parsed = StructHelper::createConditionArray($condition);
-            $parsed['filter_type'] = $filter_type;
+        return array_map(function (string $condition) use ($default_relation_filter_mode): array {
+            $relation_filter_mode = self::extractConditionQueryRelationFilterType($condition, $default_relation_filter_mode);
+            $parsed = QueryParamsStructureHelper::createConditionArray($condition);
+            $parsed['relation_filter_mode'] = $relation_filter_mode;
 
             return $parsed;
         }, $parts);
@@ -477,16 +479,16 @@ abstract class CrudRepository
     /**
      * Extract optional ::filterType from a single condition, falling back to default.
      */
-    private static function extractConditionFilterType(string &$condition, FilterType $default): FilterType
+    private static function extractConditionQueryRelationFilterType(string &$condition, QueryRelationFilterTypeEnum $default): QueryRelationFilterTypeEnum
     {
-        $parts = StringDelimitersHelper::explodeOutsideRanges('::', $condition);
+        $parts = QueryParamsStringDelimitersHelper::explodeOutsideRanges('::', $condition);
 
         if (count($parts) === 1) {
             return $default;
         }
 
         $maybe_type = $parts[count($parts) - 1];
-        $valid = array_column(FilterType::cases(), 'value');
+        $valid = array_column(QueryRelationFilterTypeEnum::cases(), 'value');
 
         if (! in_array($maybe_type, $valid, true)) {
             return $default;
@@ -495,7 +497,7 @@ abstract class CrudRepository
         array_pop($parts);
         $condition = implode('::', $parts);
 
-        return FilterType::from($maybe_type);
+        return QueryRelationFilterTypeEnum::from($maybe_type);
     }
 
     /**
@@ -520,7 +522,7 @@ abstract class CrudRepository
     {
         // SELECT
         if (! empty($struct['select'])) {
-            $clause->select(StructHelper::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
+            $clause->select(QueryParamsStructureHelper::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
         }
 
         // ORDER BY
@@ -556,17 +558,17 @@ abstract class CrudRepository
                     foreach ($condition_group['groups'] as $and_group) {
                         $q->orWhere(function ($sub_q) use ($and_group, &$clause): void {
                             foreach ($and_group['conditions'] as $condition) {
-                                $filter_type = $condition['filter_type'] ?? FilterType::Parent;
+                                $relation_filter_mode = $condition['relation_filter_mode'] ?? QueryRelationFilterTypeEnum::Parent;
                                 // whereHas/where van en el grupo; el with siempre sobre la query raíz
-                                self::processSimpleCondition($sub_q, $condition, $filter_type, $clause);
+                                self::processSimpleCondition($sub_q, $condition, $relation_filter_mode, $clause);
                             }
                         });
                     }
                 });
             } else {
                 $condition = $condition_group['condition'];
-                $filter_type = $condition['filter_type'] ?? $condition_group['filter_type'] ?? FilterType::Parent;
-                self::processSimpleCondition($clause, $condition, $filter_type, $clause);
+                $relation_filter_mode = $condition['relation_filter_mode'] ?? $condition_group['relation_filter_mode'] ?? QueryRelationFilterTypeEnum::Parent;
+                self::processSimpleCondition($clause, $condition, $relation_filter_mode, $clause);
             }
         }
     }
@@ -576,7 +578,7 @@ abstract class CrudRepository
      *
      * @param  mixed  $eager_load_query  Root query for Child/Both eager-load merge.
      */
-    private static function processSimpleCondition(&$query, array $condition, FilterType $filter_type, mixed &$eager_load_query = null): void
+    private static function processSimpleCondition(&$query, array $condition, QueryRelationFilterTypeEnum $relation_filter_mode, mixed &$eager_load_query = null): void
     {
         $eager_load_query = $eager_load_query ?? $query;
         $has_path = ! empty($condition['path']);
@@ -588,22 +590,22 @@ abstract class CrudRepository
             return;
         }
 
-        switch ($filter_type) {
-            case FilterType::Parent:
+        switch ($relation_filter_mode) {
+            case QueryRelationFilterTypeEnum::Parent:
                 // Filtra el padre; no re-aplica with para no pisar select/order del processParamsStructure
                 $query->whereHas($relation_path, function ($q) use ($condition): void {
                     self::processConditionOperator($q, $condition);
                 });
                 break;
 
-            case FilterType::Child:
+            case QueryRelationFilterTypeEnum::Child:
                 // Sólo filtra hijos cargados; fusiona con eager loads previos
                 self::mergeEagerLoadConstraint($eager_load_query, $relation_path, function ($q) use ($condition): void {
                     self::processConditionOperator($q, $condition);
                 });
                 break;
 
-            case FilterType::Both:
+            case QueryRelationFilterTypeEnum::Both:
                 $query->whereHas($relation_path, function ($q) use ($condition): void {
                     self::processConditionOperator($q, $condition);
                 });
@@ -613,7 +615,7 @@ abstract class CrudRepository
                 break;
 
             default:
-                throw new Exception("Unsupported filter type: {$filter_type->value}");
+                throw new Exception("Unsupported relation filter mode: {$relation_filter_mode->value}");
         }
     }
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bisual\LaravelShortcuts;
+namespace Bisual\LaravelShortcuts\Helpers;
 
 use Exception;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
-final class StructHelper
+final class QueryParamsStructureHelper
 {
     // -------------------------------------------------------------------------
     // Select / foreign keys (eager-load selects)
@@ -128,7 +128,7 @@ final class StructHelper
      */
     private static function extractFullKeyFromWhereSegment(string $where_segment): string // profile..users.code[=]<{900}>
     {
-        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $where_segment);
+        $open = QueryParamsStringDelimitersHelper::indexOfOutsideRanges('[', $where_segment);
         if ($open === false) {
             throw new Exception("Invalid where segment: missing key in '{$where_segment}'");
         }
@@ -146,8 +146,8 @@ final class StructHelper
      */
     private static function buildWhereCondition(string $segment): array
     {
-        $open = StringDelimitersHelper::indexOfOutsideRanges('[', $segment);
-        $close = $open === false ? false : StringDelimitersHelper::indexOfOutsideRanges(']', $segment, $open + 1);
+        $open = QueryParamsStringDelimitersHelper::indexOfOutsideRanges('[', $segment);
+        $close = $open === false ? false : QueryParamsStringDelimitersHelper::indexOfOutsideRanges(']', $segment, $open + 1);
 
         if ($open === false || $close === false) {
             throw new Exception("Invalid where condition format: '{$segment}'");
@@ -203,9 +203,9 @@ final class StructHelper
     //     // 2. separamos las $where_conditions por || para saber si hay $or_conditions y enviamos al inject
     //     // 3. dentro del inject, extraemos la clave de la condition y miramos si contiene '..' para saber en que nivel nos encontramos
     //     // 4. costruimos las condiciones con el build
-    //     foreach(StringDelimitersHelper::explodeOutsideRanges('..', $where_condition) as $relation_path) {
-    //         if (str_contains(StructHelper::extractKeyFromWhereSegment($relation_path), '.')) {
-    //             [$key, $where_string] = StringDelimitersHelper::explodeOutsideRanges('.', $relation_path);
+    //     foreach(QueryParamsStringDelimitersHelper::explodeOutsideRanges('..', $where_condition) as $relation_path) {
+    //         if (str_contains(QueryParamsStructureHelper::extractKeyFromWhereSegment($relation_path), '.')) {
+    //             [$key, $where_string] = QueryParamsStringDelimitersHelper::explodeOutsideRanges('.', $relation_path);
     //             if (!array_key_exists($key, $current)) {
     //                 throw new Exception("You can't apply conditions on field that are not in the relation.");
     //             }

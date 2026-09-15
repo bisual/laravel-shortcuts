@@ -1,6 +1,6 @@
 <?php
 
-namespace Bisual\LaravelShortcuts;
+namespace Bisual\LaravelShortcuts\Helpers;
 
 class Helper
 {

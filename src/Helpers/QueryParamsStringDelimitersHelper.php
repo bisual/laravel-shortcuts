@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Bisual\LaravelShortcuts;
+namespace Bisual\LaravelShortcuts\Helpers;
 
 use Exception;
 
-final class StringDelimitersHelper
+final class QueryParamsStringDelimitersHelper
 {
     /**
      * Default pairs for explode: values and operators (so commas in [date,>=] are kept).

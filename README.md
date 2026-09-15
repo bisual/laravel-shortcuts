@@ -115,9 +115,9 @@ Values must be wrapped in `<{ }>`. Relation depth uses `..`, same as `with`. The
 
 Multiple values for `in`, `notIn`, `between` and `notBetween` are separated by `|` inside `<{ }>`.
 
-##### Filter type (`::parent` \| `::child` \| `::both`)
+##### Relation filter mode (`::parent` \| `::child` \| `::both`)
 
-When the condition targets a relation, append a filter type (default is `parent`):
+When the condition targets a relation, append a relation filter mode (default is `parent`):
 
 ```bash
 # parent (default): keep parents that match via whereHas
@@ -152,7 +152,7 @@ When the condition targets a relation, append a filter type (default is `parent`
 # OR across relations (group-level ::parent applies to both unless overridden)
 ?where=children.name[=]<{Flutter}>||children.name[=]<{Next Lives}>::parent
 
-# per-condition filter type
+# per-condition relation filter mode
 ?where=comments.content[like]<{deadlock%}>::parent||tags.name[=]<{urgent}>::child
 ```
 

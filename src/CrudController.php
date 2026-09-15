@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bisual\LaravelShortcuts;
 
+use Bisual\LaravelShortcuts\Helpers\ControllerValidationHelper;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
