@@ -28,6 +28,8 @@ class BisualResourceMakeCommand extends Command
 
     protected $description = 'Create a Bisual model resource with optional CRUD companions';
 
+    protected bool $wasPrompted = false;
+
     public function handle(): int
     {
         if (! $this->askForName()) {
@@ -72,7 +74,9 @@ class BisualResourceMakeCommand extends Command
             $this->createPolicy();
         }
 
-        $this->writeShortcutHint();
+        if ($this->wasPrompted) {
+            $this->writeShortcutHint();
+        }
 
         return self::SUCCESS;
     }
@@ -84,6 +88,8 @@ class BisualResourceMakeCommand extends Command
         if (is_string($name) && trim($name) !== '') {
             return $this->guardAgainstExistingModel($name);
         }
+
+        $this->wasPrompted = true;
 
         $this->input->setArgument('name', text(
             label: 'What is the model name?',
@@ -169,6 +175,8 @@ class BisualResourceMakeCommand extends Command
 
     protected function promptForComponents(): void
     {
+        $this->wasPrompted = true;
+
         (new Collection(multiselect(
             label: 'Desired components',
             options: [
