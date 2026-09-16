@@ -44,7 +44,7 @@ abstract class CrudRepository
 
             /** @var list<string>|null $searchable_fields */
             $searchable_fields = (new static::$model)->searchable;
-            
+
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
                 $search = $params['search'];
