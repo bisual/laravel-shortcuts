@@ -2,6 +2,16 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.4.0 - 2026-09-16
+
+### What's Changed
+
+* Bump aglipanci/laravel-pint-action from 2.2.0 to 2.3.1 by @dependabot[bot] in https://github.com/bisual/laravel-shortcuts/pull/26
+* BP1699 into main by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/20
+* BP1314 into main by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/12
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.3.2...v1.4.0
+
 ## v1.3.1 - 2026-06-10
 
 ### What's Changed
