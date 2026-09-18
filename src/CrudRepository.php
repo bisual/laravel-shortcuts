@@ -23,6 +23,38 @@ use Illuminate\Support\Stringable;
 
 /**
  * @template TModel of Model
+ *
+ * @phpstan-type EagerConstraint array{attribute: string, value: int|string|bool|BackedEnum|null}
+ * @phpstan-type WhereCondition array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}
+ * @phpstan-type WhereConditionGroup array{
+ *     or_group?: bool,
+ *     groups?: list<array{conditions: list<WhereCondition>}>,
+ *     relation_filter_mode?: QueryRelationFilterTypeEnum,
+ *     condition?: WhereCondition
+ * }
+ * @phpstan-type RelationLeaf array{
+ *     with?: array<string, array{
+ *         select?: list<string>,
+ *         order_by?: array<string, string>,
+ *         constraints?: list<EagerConstraint>
+ *     }>,
+ *     select?: list<string>,
+ *     order_by?: array<string, string>,
+ *     constraints?: list<EagerConstraint>
+ * }
+ * @phpstan-type RelationNode array{
+ *     with?: array<string, RelationLeaf>,
+ *     select?: list<string>,
+ *     order_by?: array<string, string>,
+ *     constraints?: list<EagerConstraint>
+ * }
+ * @phpstan-type QueryParamsStructure array{
+ *     with?: array<string, RelationNode>,
+ *     select?: list<string>,
+ *     order_by?: array<string, string>,
+ *     constraints?: list<EagerConstraint>,
+ *     where_conditions?: list<WhereConditionGroup>
+ * }
  */
 abstract class CrudRepository
 {
@@ -333,26 +365,7 @@ abstract class CrudRepository
     /**
      * Build the structure for gived query params.
      *
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $struct
+     * @param  QueryParamsStructure|RelationNode  $struct
      */
     private static function processParamsStructure(Builder|Relation $clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
@@ -401,26 +414,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $config
+     * @param  RelationNode  $config
      */
     private static function processMorphToWith(MorphTo $morph_to, array $config, Model $parent_model, string $relation): void
     {
@@ -467,30 +461,12 @@ abstract class CrudRepository
     /**
      * Create an array processing params.
      *
-     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
-     * @return array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }
+     * @param  array<string, list<EagerConstraint>>  $with_constraints
+     * @return QueryParamsStructure
      */
     private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null, array $with_constraints = []): array
     {
+        /** @var QueryParamsStructure $struct */
         $struct = [];
 
         if ($string_with) {
@@ -519,6 +495,8 @@ abstract class CrudRepository
                         $parts[0] => $order_by_direction,
                     ];
                 } else {
+                    $struct['with'] ??= [];
+                    /** @var array<string, RelationNode> $current */
                     $current = &$struct['with'];
                     foreach (explode('..', $order_by_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
@@ -537,6 +515,7 @@ abstract class CrudRepository
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
 
+                            $current[$relation_path]['with'] ??= [];
                             $current = &$current[$relation_path]['with'];
                         }
                     }
@@ -552,6 +531,8 @@ abstract class CrudRepository
                     $current = &$struct;
                     $current['select'] = explode('|', $select_segment);
                 } else {
+                    $struct['with'] ??= [];
+                    /** @var array<string, RelationNode> $current */
                     $current = &$struct['with'];
                     foreach (explode('..', $select_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
@@ -566,6 +547,7 @@ abstract class CrudRepository
                                 throw new Exception("You can't select field that are not in the relation."); // esto da error
                             }
 
+                            $current[$relation_path]['with'] ??= [];
                             $current = &$current[$relation_path]['with'];
                         }
                     }
@@ -687,27 +669,8 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $struct
-     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
+     * @param  QueryParamsStructure  $struct
+     * @param  array<string, list<EagerConstraint>>  $with_constraints
      */
     private static function attachWithConstraints(array &$struct, array $with_constraints): void
     {
@@ -814,26 +777,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $struct
+     * @param  QueryParamsStructure  $struct
      */
     private static function applyRelationExistenceFilters(Builder $clause, array $struct): void
     {
@@ -979,12 +923,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  list<array{
-     *     or_group?: bool,
-     *     groups?: list<array{conditions: list<array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}>}>,
-     *     relation_filter_mode?: QueryRelationFilterTypeEnum,
-     *     condition?: array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}
-     * }>  $where_conditions
+     * @param  list<WhereConditionGroup>  $where_conditions
      */
     private static function applyWhereConditionsToStructure(Builder $clause, array $where_conditions): void
     {
