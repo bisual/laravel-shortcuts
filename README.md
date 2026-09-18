@@ -106,7 +106,7 @@ With `-c` and no `-d`, those properties are empty arrays (a minimal CRUD control
 
 ## Custom query params usage
 
-You can build different formats of query params to handle sort, select and with in different depths of your query.
+You can build different formats of query params to handle sort, select, with and where in different depths of your query.
 
 #### -- WITH --
 
@@ -147,9 +147,83 @@ And once again, you can choose what information about your relationship you rece
 ?select=relation..relation2..relation3.name|description
 ```
 
+#### -- WHERE --
+
+Filter results with a structured condition string. Basic shape:
+
+```bash
+?where=field[operator]<{value}>
+```
+
+Values must be wrapped in `<{ }>`. Relation depth uses `..`, same as `with`. The column is the last segment after `.`.
+
+```bash
+# root table
+?where=status[=]<{active}>
+
+# nested relation
+?where=users..profiles.role[=]<{manager}>
+```
+
+##### Operators
+
+| Operator | Example |
+|---|---|
+| `=` `!=` `>` `<` `>=` `<=` | `age[>=]<{18}>` |
+| `like` / `notLike` | `name[like]<{deadlock%}>` |
+| `in` / `notIn` | `slug[in]<{draft\|published}>` |
+| `null` / `notNull` | `deleted_at[null]<>` |
+| `between` / `notBetween` | `id[between]<{10\|20}>` |
+| `date,<op>` | `created_at[date,>=]<{2024-01-01}>` |
+
+Multiple values for `in`, `notIn`, `between` and `notBetween` are separated by `|` inside `<{ }>`.
+
+##### Relation filter mode (`::parent` \| `::child` \| `::both`)
+
+When the condition targets a relation, append a relation filter mode (default is `parent`):
+
+```bash
+# parent (default): keep parents that match via whereHas
+?where=comments.content[like]<{deadlock%}>
+?where=comments.content[like]<{deadlock%}>::parent
+
+# child: do not filter parents; only constrain eager-loaded children (use with)
+?where=comments.content[like]<{deadlock%}>::child&with=comments
+
+# both: whereHas + constrained eager load
+?where=comments.content[like]<{deadlock%}>::both&with=comments
+```
+
+##### Grouping
+
+| Separator | Meaning |
+|---|---|
+| `,` | AND between condition blocks |
+| `\|\|` | OR inside a block |
+| `&&` | AND inside a block (also without OR) |
+
+```bash
+# AND (comma)
+?where=status[=]<{active}>,type[=]<{task}>
+
+# AND without OR
+?where=slug[=]<{undefined}>&&name[like]<{%contract%}>
+
+# OR
+?where=status[=]<{draft}>||status[=]<{published}>
+
+# OR across relations (group-level ::parent applies to both unless overridden)
+?where=children.name[=]<{Flutter}>||children.name[=]<{Next Lives}>::parent
+
+# per-condition relation filter mode
+?where=comments.content[like]<{deadlock%}>::parent||tags.name[=]<{urgent}>::child
+```
+
+Separators are ignored when they appear inside `<{ }>` or `[ ]`, so values and operators may contain `,`, `||`, `&&` or `::` safely (e.g. `created_at[date,>=]<{2024-01-01}>`).
+
 #### -- FILTER BY RELATION ATTRIBUTE --
 
-You can filter parent rows by an attribute of a related model. The same value rules as for normal attribute filters apply (`null`, `notnull`, enums, comma-separated lists, booleans, numeric equality, or `LIKE` for strings).
+For simple equality-style filters without the `where` DSL, you can still pass related attributes as normal params. The same value rules as for root attributes apply (`null`, `notnull`, enums, comma-separated lists, booleans, numeric equality, or `LIKE` for strings).
 
 ```bash
 # HTTP query string — use "-" (PHP turns "." into "_" in query keys)
@@ -161,16 +235,12 @@ YourRepository::index(params: [
 ]);
 ```
 
-- `.` — programmatic params (`author.name`, `records.is_archived`)
-- `-` — HTTP query keys (`author-name`, `records-is_archived`)
+- `.` — programmatic params (`author.name`, `records.is_archived`); with `with=relation`, also constrains the eager load
+- `-` — HTTP query keys (`author-name`, `records-is_archived`); filters parents only
 
-BelongsTo / HasMany / similar relations use `whereHas`. MorphTo relations use `whereHasMorph` and only query morph types that actually have that column.
+BelongsTo / HasMany / similar relations use `whereHas`. MorphTo uses `whereHasMorph` and only queries morph types that have that column.
 
-When you also pass `with=relation` and use the `.` form (`relation.attribute=value`), the constraint is applied both to parent existence and to the eager-loaded relation. The `-` form still filters parents, but does not constrain the eager load.
-
-```bash
-?with=author&author.company_id=1
-```
+For operators, nesting, OR/AND grouping, or explicit `::parent` / `::child` / `::both` control, prefer the `where` param above.
 
 #### ⚙️ Generalities
 
@@ -180,6 +250,7 @@ In all cases, to separate different relationships, regardless of the depth level
 ?with=users,relation..relation2
 ?order_by=users.name,relation..relation2.created_at:desc
 ?select=users.name,relation..relation2.title|description|created_at
+?where=status[=]<{active}>,users..profiles.role[=]<{manager}>::parent
 ```
 
 **NOTE**: The query param 'order_by_direction' is not necessary when using laravel-shortcuts since it is applied directly in 'order_by', using it could cause errors.

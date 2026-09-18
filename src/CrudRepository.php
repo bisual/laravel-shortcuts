@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Bisual\LaravelShortcuts;
 
 use BackedEnum;
+use Bisual\LaravelShortcuts\Enums\QueryRelationFilterTypeEnum;
+use Bisual\LaravelShortcuts\Helpers\QueryParamsStringDelimitersHelper;
+use Bisual\LaravelShortcuts\Helpers\QueryParamsStructureHelper;
 use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
+use Closure;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -21,6 +23,38 @@ use Illuminate\Support\Stringable;
 
 /**
  * @template TModel of Model
+ *
+ * @phpstan-type EagerConstraint array{attribute: string, value: int|string|bool|BackedEnum|null}
+ * @phpstan-type WhereCondition array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}
+ * @phpstan-type WhereConditionGroup array{
+ *     or_group?: bool,
+ *     groups?: list<array{conditions: list<WhereCondition>}>,
+ *     relation_filter_mode?: QueryRelationFilterTypeEnum,
+ *     condition?: WhereCondition
+ * }
+ * @phpstan-type RelationLeaf array{
+ *     with?: array<string, array{
+ *         select?: list<string>,
+ *         order_by?: array<string, string>,
+ *         constraints?: list<EagerConstraint>
+ *     }>,
+ *     select?: list<string>,
+ *     order_by?: array<string, string>,
+ *     constraints?: list<EagerConstraint>
+ * }
+ * @phpstan-type RelationNode array{
+ *     with?: array<string, RelationLeaf>,
+ *     select?: list<string>,
+ *     order_by?: array<string, string>,
+ *     constraints?: list<EagerConstraint>
+ * }
+ * @phpstan-type QueryParamsStructure array{
+ *     with?: array<string, RelationNode>,
+ *     select?: list<string>,
+ *     order_by?: array<string, string>,
+ *     constraints?: list<EagerConstraint>,
+ *     where_conditions?: list<WhereConditionGroup>
+ * }
  */
 abstract class CrudRepository
 {
@@ -45,11 +79,15 @@ abstract class CrudRepository
         }
 
         if (count($params) > 0) {
-            // handling with, order_by and select
+            // query params on deepest with
             $clause = self::getClause($params);
 
+            $model_inst = new static::$model;
+            $searchable = get_object_vars($model_inst)['searchable'] ?? null;
             /** @var list<string>|null $searchable_fields */
-            $searchable_fields = (new static::$model)->searchable;
+            $searchable_fields = is_array($searchable)
+                ? array_values(array_filter($searchable, is_string(...)))
+                : null;
 
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
@@ -87,8 +125,6 @@ abstract class CrudRepository
             $whereClause = [];
 
             if (count($params) > 0) {
-                $model_inst = (new static::$model);
-
                 foreach ($params as $attr => $val) {
                     if ($val !== null && $val !== '') {
                         $relation_filter = self::getRelationFilter($model_inst, $attr);
@@ -120,8 +156,8 @@ abstract class CrudRepository
             if (is_string($scopes)) {
                 foreach (explode(',', $scopes) as $scope) {
                     $scope_destruct = explode(':', $scope);
-                    if (count($scope_destruct) > 0) {
-                        $scope_method = array_shift($scope_destruct);
+                    $scope_method = array_shift($scope_destruct);
+                    if ($scope_method !== '') {
                         $clause->{$scope_method}(...$scope_destruct);
                     }
                 }
@@ -176,7 +212,8 @@ abstract class CrudRepository
             }
 
             return $data;
-        } elseif (is_callable($callback)) {
+        }
+        if (is_callable($callback)) {
             $clause = (static::$model)::query();
             $callback($clause, $params);
 
@@ -195,7 +232,7 @@ abstract class CrudRepository
      */
     public static function show(int|string|array|object $id, array $params = [], ?callable $callback = null, bool $withoutGlobalScopes = false): Model
     {
-        // handling with, order_by and select
+        // query params on deepest with
         $clause = self::getClause($params, $withoutGlobalScopes);
 
         if ($callback !== null) {
@@ -205,7 +242,7 @@ abstract class CrudRepository
         if ($id instanceof static::$model) {
             return $id;
         } // ja li hem passat el model
-        elseif (is_object($id)) {
+        if (is_object($id)) {
             $id = $id->id;
         } // per si li hem passat algun altre objecte
         elseif (is_array($id)) {
@@ -213,7 +250,11 @@ abstract class CrudRepository
         } // per si li hem passat en array
 
         if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
-            $clause->byUUID($id);
+            $model = new static::$model;
+            $uuid_field = method_exists($model, 'getUUIDFieldName')
+                ? $model->getUUIDFieldName()
+                : 'uuid';
+            $clause->where($uuid_field, $id);
         } else {
             $clause->where(App::make(static::$model)->getKeyName(), $id);
         }
@@ -230,6 +271,7 @@ abstract class CrudRepository
     }
 
     /**
+     * @param  array<string, array|bool|float|int|object|string|null>  $data
      * @return TModel
      */
     public static function store(array $data): Model
@@ -239,6 +281,7 @@ abstract class CrudRepository
 
     /**
      * @param  int|string|array<string, int|string>|object  $model
+     * @param  array<string, array|bool|float|int|object|string|null>  $params
      * @return TModel
      */
     public static function update(int|string|array|object $model, array $params): Model
@@ -259,7 +302,7 @@ abstract class CrudRepository
         $model = self::show($model);
 
         if ($callback !== null) {
-            $callback($model->id);
+            $callback($model->getKey());
         }
 
         $model->delete();
@@ -277,31 +320,29 @@ abstract class CrudRepository
             ? (static::$model)::query()->withoutGlobalScopes()
             : (static::$model)::query();
 
-        // With
-        $with = null;
-        if (isset($params['with'])) {
-            $with = $params['with'];
-            unset($params['with']);
+        $query_params = [];
+        foreach (['with', 'order_by', 'select', 'where'] as $key) {
+            if (isset($params[$key])) {
+                $query_params[$key] = $params[$key];
+                unset($params[$key]);
+            }
         }
 
-        // Order by
-        $order_by = null;
-        if (isset($params['order_by'])) {
-            $order_by = $params['order_by'];
-            unset($params['order_by']);
-        }
+        if ($query_params !== []) {
+            $with = isset($query_params['with']) && is_string($query_params['with']) ? $query_params['with'] : null;
+            $order_by = isset($query_params['order_by']) && is_string($query_params['order_by']) ? $query_params['order_by'] : null;
+            $select = isset($query_params['select']) && is_string($query_params['select']) ? $query_params['select'] : null;
+            $where = isset($query_params['where']) && is_string($query_params['where']) ? $query_params['where'] : null;
+            $with_constraints = $with !== null ? self::extractWithConstraints($params, $with) : [];
 
-        // Select
-        $select = null;
-        if (isset($params['select'])) {
-            $select = $params['select'];
-            unset($params['select']);
-        }
-
-        if ($with || $order_by || $select) {
-            $with_constraints = $with ? self::extractWithConstraints($params, $with) : [];
-
-            self::handleWithOrderByAndSelect($clause, $with, $order_by, $select, $with_constraints);
+            self::buildQueryFromParams(
+                $clause,
+                $with,
+                $order_by,
+                $select,
+                $where,
+                $with_constraints,
+            );
         }
 
         return $clause;
@@ -310,73 +351,62 @@ abstract class CrudRepository
     /**
      * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
      */
-    private static function handleWithOrderByAndSelect(Builder &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
+    private static function buildQueryFromParams(Builder $clause, ?string $with = null, ?string $order_by = null, ?string $select = null, ?string $where = null, array $with_constraints = []): void
     {
-        $struct = self::getParamsStructure($with, $order_by, $select, $with_constraints);
+        $struct = self::getParamsStructure($with, $order_by, $select, $where, $with_constraints);
         self::processParamsStructure($clause, $struct);
         self::applyRelationExistenceFilters($clause, $struct);
+
+        if (filled($where)) {
+            self::applyWhereConditionsToStructure($clause, $struct['where_conditions'] ?? []);
+        }
     }
 
     /**
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $struct
+     * Build the structure for gived query params.
+     *
+     * @param  QueryParamsStructure|RelationNode  $struct
      */
-    private static function processParamsStructure(Builder|Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    private static function processParamsStructure(Builder|Relation $clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
+        $builder = $clause instanceof Relation ? $clause->getQuery() : $clause;
+
         // SELECT
         if (! empty($struct['select'])) {
-            $clause->select(self::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
+            $builder->select(QueryParamsStructureHelper::buildSelectRequiredFields($struct['select'], $parent_model, $relation));
         }
 
         // ORDER BY
         if (! empty($struct['order_by'])) {
             $order_field = array_key_first($struct['order_by']);
             $direction = $struct['order_by'][$order_field];
-            $clause->orderBy($order_field, $direction);
+            $builder->orderBy($order_field, $direction);
         }
 
         // CONSTRAINTS on eager-loaded relations (?with=relation&relation.attribute=value)
         if (! empty($struct['constraints'])) {
             foreach ($struct['constraints'] as $constraint) {
-                self::applyEagerLoadConstraint($clause, $constraint['attribute'], $constraint['value']);
+                self::applyEagerLoadConstraint($builder, $constraint['attribute'], $constraint['value']);
             }
         }
 
         // WITH
         if (! empty($struct['with'])) {
             foreach ($struct['with'] as $nested_relation => $config) {
-                $parent_model_for_relation = $clause->getModel();
+                $parent_model_for_relation = $builder->getModel();
                 $relation_instance = self::getRelation($parent_model_for_relation, $nested_relation);
 
                 if ($relation_instance instanceof MorphTo) {
-                    $clause->with($nested_relation, function (MorphTo $query) use ($nested_relation, $config, $clause): void {
-                        $parent_model = $clause->getModel();
+                    $builder->with($nested_relation, function (MorphTo $query) use ($nested_relation, $config, $builder): void {
+                        $parent_model = $builder->getModel();
                         self::processMorphToWith($query, $config, $parent_model, $nested_relation);
                     });
 
                     continue;
                 }
 
-                $clause->with($nested_relation, function (Relation $r) use ($nested_relation, $config, $clause): void {
-                    $parent_model = $clause->getModel();
+                $builder->with($nested_relation, function (Relation $r) use ($nested_relation, $config, $builder): void {
+                    $parent_model = $builder->getModel();
                     self::processParamsStructure($r, $config, $parent_model, $nested_relation);
                 });
             }
@@ -384,26 +414,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $config
+     * @param  RelationNode  $config
      */
     private static function processMorphToWith(MorphTo $morph_to, array $config, Model $parent_model, string $relation): void
     {
@@ -418,13 +429,13 @@ abstract class CrudRepository
             return;
         }
 
-        /** @var array<class-string<Model>, array<string, \Closure(Relation): void>> $morph_with */
+        /** @var array<class-string<Model>, array<string, Closure(Relation): void>> $morph_with */
         $morph_with = [];
 
         foreach (array_keys($morph_to->getDictionary()) as $type) {
             $class = Model::getActualClassNameForMorph((string) $type);
 
-            /** @var array<string, \Closure(Relation): void> $with_for_type */
+            /** @var array<string, Closure(Relation): void> $with_for_type */
             $with_for_type = [];
 
             foreach ($nested_with as $nested_relation => $nested_config) {
@@ -450,31 +461,12 @@ abstract class CrudRepository
     /**
      * Create an array processing params.
      *
-     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
-     * @return array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }
+     * @param  array<string, list<EagerConstraint>>  $with_constraints
+     * @return QueryParamsStructure
      */
-    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, array $with_constraints = []): array
+    private static function getParamsStructure(?string $string_with = null, ?string $string_order_by = null, ?string $string_select = null, ?string $string_where = null, array $with_constraints = []): array
     {
-        /** @var array{with?: array<string, array{with?: array<string, array{with?: array<string, array{select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>}>, select?: list<string>, order_by?: array<string, string>, constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>} $struct */
+        /** @var QueryParamsStructure $struct */
         $struct = [];
 
         if ($string_with) {
@@ -503,6 +495,8 @@ abstract class CrudRepository
                         $parts[0] => $order_by_direction,
                     ];
                 } else {
+                    $struct['with'] ??= [];
+                    /** @var array<string, RelationNode> $current */
                     $current = &$struct['with'];
                     foreach (explode('..', $order_by_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
@@ -521,6 +515,7 @@ abstract class CrudRepository
                                 throw new Exception("You can't order by field that are not in the relation.");
                             }
 
+                            $current[$relation_path]['with'] ??= [];
                             $current = &$current[$relation_path]['with'];
                         }
                     }
@@ -536,22 +531,57 @@ abstract class CrudRepository
                     $current = &$struct;
                     $current['select'] = explode('|', $select_segment);
                 } else {
+                    $struct['with'] ??= [];
+                    /** @var array<string, RelationNode> $current */
                     $current = &$struct['with'];
                     foreach (explode('..', $select_segment) as $relation_path) {
                         if (str_contains($relation_path, '.')) {
                             [$key, $select] = explode('.', $relation_path, 2);
                             if (! array_key_exists($key, $current)) {
-                                throw new Exception("You can't select field that are not in the relation.");
+                                throw new Exception("You can't select field that are not in the relation."); // esto da error
                             }
 
                             $current[$key]['select'] = explode('|', $select);
                         } else {
                             if (! array_key_exists($relation_path, $current)) {
-                                throw new Exception("You can't select field that are not in the relation.");
+                                throw new Exception("You can't select field that are not in the relation."); // esto da error
                             }
 
+                            $current[$relation_path]['with'] ??= [];
                             $current = &$current[$relation_path]['with'];
                         }
+                    }
+                }
+            }
+        }
+
+        if ($string_where) {
+            // process $string_where
+            foreach (QueryParamsStringDelimitersHelper::explodeOutsideRanges(',', $string_where) as $where_segment) {
+                // Default del bloque (sufijo ::parent|child|both al final del segmento)
+                $default_relation_filter_mode = self::getQueryRelationFilterType($where_segment);
+
+                $or_conditions = QueryParamsStringDelimitersHelper::explodeOutsideRanges('||', $where_segment);
+
+                if (count($or_conditions) > 1) {
+                    $condition_group = [
+                        'or_group' => true,
+                        'groups' => [],
+                    ];
+
+                    foreach ($or_conditions as $or_condition) {
+                        $condition_group['groups'][] = [
+                            'conditions' => self::parseAndConditions($or_condition, $default_relation_filter_mode),
+                        ];
+                    }
+
+                    $struct['where_conditions'][] = $condition_group;
+                } else {
+                    foreach (self::parseAndConditions($where_segment, $default_relation_filter_mode) as $condition) {
+                        $struct['where_conditions'][] = [
+                            'relation_filter_mode' => $condition['relation_filter_mode'],
+                            'condition' => $condition,
+                        ];
                     }
                 }
             }
@@ -560,6 +590,30 @@ abstract class CrudRepository
         self::attachWithConstraints($struct, $with_constraints);
 
         return $struct;
+    }
+
+    /**
+     * Extract group-level ::parent|child|both default from a where segment.
+     */
+    private static function getQueryRelationFilterType(string &$where_segment): QueryRelationFilterTypeEnum
+    {
+        $parts = QueryParamsStringDelimitersHelper::explodeOutsideRanges('::', $where_segment);
+
+        if (count($parts) === 1) {
+            return QueryRelationFilterTypeEnum::Parent;
+        }
+
+        $maybe_type = $parts[count($parts) - 1];
+        $valid = array_column(QueryRelationFilterTypeEnum::cases(), 'value');
+
+        if (! in_array($maybe_type, $valid, true)) {
+            return QueryRelationFilterTypeEnum::Parent;
+        }
+
+        array_pop($parts);
+        $where_segment = implode('::', $parts);
+
+        return QueryRelationFilterTypeEnum::from($maybe_type);
     }
 
     /**
@@ -574,7 +628,7 @@ abstract class CrudRepository
         $relation_paths = [];
 
         foreach (explode(',', $with) as $segment) {
-            $segment = trim($segment);
+            $segment = mb_trim($segment);
             if ($segment === '') {
                 continue;
             }
@@ -592,13 +646,13 @@ abstract class CrudRepository
         $constraints = [];
 
         foreach ($params as $attr => $val) {
-            if (! is_string($attr) || ! str_contains($attr, '.')) {
+            if (! str_contains($attr, '.')) {
                 continue;
             }
 
-            $last_dot = strrpos($attr, '.');
-            $relation_path = substr($attr, 0, $last_dot);
-            $attribute = substr($attr, $last_dot + 1);
+            $last_dot = mb_strrpos($attr, '.');
+            $relation_path = mb_substr($attr, 0, $last_dot);
+            $attribute = mb_substr($attr, $last_dot + 1);
 
             if ($attribute === '' || ! isset($relation_paths[$relation_path])) {
                 continue;
@@ -615,27 +669,8 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $struct
-     * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
+     * @param  QueryParamsStructure  $struct
+     * @param  array<string, list<EagerConstraint>>  $with_constraints
      */
     private static function attachWithConstraints(array &$struct, array $with_constraints): void
     {
@@ -700,7 +735,7 @@ abstract class CrudRepository
         $attribute = array_pop($parts);
         $relation = implode($separator, $parts);
 
-        $is_invalid_relation_filter = $attribute === '' || $relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null;
+        $is_invalid_relation_filter = self::getRelation($model, explode('.', $relation)[0]) === null;
 
         if ($is_invalid_relation_filter) {
             return null;
@@ -742,26 +777,7 @@ abstract class CrudRepository
     }
 
     /**
-     * @param  array{
-     *     with?: array<string, array{
-     *         with?: array<string, array{
-     *             with?: array<string, array{
-     *                 select?: list<string>,
-     *                 order_by?: array<string, string>,
-     *                 constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *             }>,
-     *             select?: list<string>,
-     *             order_by?: array<string, string>,
-     *             constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *         }>,
-     *         select?: list<string>,
-     *         order_by?: array<string, string>,
-     *         constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     *     }>,
-     *     select?: list<string>,
-     *     order_by?: array<string, string>,
-     *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
-     * }  $struct
+     * @param  QueryParamsStructure  $struct
      */
     private static function applyRelationExistenceFilters(Builder $clause, array $struct): void
     {
@@ -787,7 +803,7 @@ abstract class CrudRepository
             return;
         }
 
-        /** @var array<class-string<Model>, \Closure(Builder): void> $callbacks */
+        /** @var array<class-string<Model>, Closure(Builder): void> $callbacks */
         $callbacks = [];
 
         foreach (array_keys($morph_to->getDictionary()) as $type) {
@@ -851,62 +867,262 @@ abstract class CrudRepository
     }
 
     /**
-     * Get the $model->$relation foreign key data.
+     * Split a segment by && into condition arrays.
+     * Each condition may override the default filter type with ::parent|child|both.
      *
-     * @return list<string>
+     * @return array<int, array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}>
      */
-    private static function getForeignKeyData(Model $model, string $relation): array
+    private static function parseAndConditions(string $segment, QueryRelationFilterTypeEnum $default_relation_filter_mode = QueryRelationFilterTypeEnum::Parent): array
     {
-        if (! method_exists($model, $relation)) {
-            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
-        }
+        $parts = QueryParamsStringDelimitersHelper::explodeOutsideRanges('&&', $segment);
 
-        $relation_instance = $model->{$relation}();
+        return array_map(function (string $condition) use ($default_relation_filter_mode): array {
+            $relation_filter_mode = self::extractConditionQueryRelationFilterType($condition, $default_relation_filter_mode);
+            $parsed = QueryParamsStructureHelper::createConditionArray($condition);
+            $parsed['relation_filter_mode'] = $relation_filter_mode;
 
-        if (! $relation_instance instanceof Relation) {
-            throw new Exception("Relation '{$relation}' not found in model ".$model::class);
-        }
-
-        if ($relation_instance instanceof MorphTo
-            || $relation_instance instanceof MorphOne
-            || $relation_instance instanceof MorphMany
-        ) {
-            return [
-                $relation_instance->getForeignKeyName(),
-                $relation_instance->getMorphType(),
-            ];
-        }
-
-        if (method_exists($relation_instance, 'getForeignKeyName')) {
-            return [$relation_instance->getForeignKeyName()];
-        }
-
-        return [];
+            return $parsed;
+        }, $parts);
     }
 
     /**
-     * Build the select required fomat and fields.
+     * Extract optional ::filterType from a single condition, falling back to default.
+     */
+    private static function extractConditionQueryRelationFilterType(string &$condition, QueryRelationFilterTypeEnum $default): QueryRelationFilterTypeEnum
+    {
+        $parts = QueryParamsStringDelimitersHelper::explodeOutsideRanges('::', $condition);
+
+        if (count($parts) === 1) {
+            return $default;
+        }
+
+        $maybe_type = $parts[count($parts) - 1];
+        $valid = array_column(QueryRelationFilterTypeEnum::cases(), 'value');
+
+        if (! in_array($maybe_type, $valid, true)) {
+            return $default;
+        }
+
+        array_pop($parts);
+        $condition = implode('::', $parts);
+
+        return QueryRelationFilterTypeEnum::from($maybe_type);
+    }
+
+    /**
+     * Transform multiple values from string to array (separator |).
      *
-     * @param  list<string>  $select_fields
      * @return list<string>
      */
-    private static function buildSelectRequiredFields(array $select_fields, ?Model $parent_model = null, ?string $relation = null): array
+    private static function parseMultipleValues(string $raw_value, string $separator = '|'): array
     {
-        return array_unique(array_merge( // array_unique if we get the id from the front
-            ['id'],
-            $select_fields,
-            $parent_model && $relation ? self::getForeignKeyData($parent_model, $relation) : []
+        return array_values(array_filter(
+            array_map('trim', explode($separator, $raw_value)),
+            fn (string $value): bool => $value !== ''
         ));
     }
+
+    /**
+     * @param  list<WhereConditionGroup>  $where_conditions
+     */
+    private static function applyWhereConditionsToStructure(Builder $clause, array $where_conditions): void
+    {
+        foreach ($where_conditions as $condition_group) {
+            if (! empty($condition_group['or_group'])) {
+                $clause->where(function (Builder $query) use ($condition_group, $clause): void {
+                    foreach ($condition_group['groups'] ?? [] as $and_group) {
+                        $query->orWhere(function (Builder $sub_query) use ($and_group, $clause): void {
+                            foreach ($and_group['conditions'] as $condition) {
+                                $relation_filter_mode = $condition['relation_filter_mode'];
+                                // whereHas/where van en el grupo; el with siempre sobre la query raíz
+                                self::processSimpleCondition($sub_query, $condition, $relation_filter_mode, $clause);
+                            }
+                        });
+                    }
+                });
+            } else {
+                $condition = $condition_group['condition'] ?? null;
+                if ($condition === null) {
+                    continue;
+                }
+
+                $relation_filter_mode = $condition['relation_filter_mode'];
+                self::processSimpleCondition($clause, $condition, $relation_filter_mode, $clause);
+            }
+        }
+    }
+
+    /**
+     * Process simple condition ['key', 'operator', 'value', 'path'].
+     *
+     * @param  array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}  $condition
+     */
+    private static function processSimpleCondition(Builder $query, array $condition, QueryRelationFilterTypeEnum $relation_filter_mode, ?Builder $eager_load_query = null): void
+    {
+        $eager_load_query = $eager_load_query ?? $query;
+        $relation_path = $condition['path'] !== null
+            ? str_replace('..', '.', $condition['path'])
+            : null;
+
+        if (blank($relation_path)) {
+            self::processConditionOperator($query, $condition);
+
+            return;
+        }
+
+        switch ($relation_filter_mode) {
+            case QueryRelationFilterTypeEnum::Parent:
+                // Filtra el padre; no re-aplica with para no pisar select/order del processParamsStructure
+                $query->whereHas($relation_path, function (Builder $q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                break;
+
+            case QueryRelationFilterTypeEnum::Child:
+                // Sólo filtra hijos cargados; fusiona con eager loads previos
+                self::mergeEagerLoadConstraint($eager_load_query, $relation_path, function (Builder $q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                break;
+
+            case QueryRelationFilterTypeEnum::Both:
+                $query->whereHas($relation_path, function (Builder $q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                self::mergeEagerLoadConstraint($eager_load_query, $relation_path, function (Builder $q) use ($condition): void {
+                    self::processConditionOperator($q, $condition);
+                });
+                break;
+
+            default:
+                throw new Exception("Unsupported relation filter mode: {$relation_filter_mode->value}");
+        }
+    }
+
+    /**
+     * Merge a constraint into an existing eager load instead of overwriting it.
+     */
+    private static function mergeEagerLoadConstraint(Builder|Relation $query, string $relation_path, Closure $constraint): void
+    {
+        $builder = $query instanceof Relation ? $query->getQuery() : $query;
+        $eager_loads = $builder->getEagerLoads();
+        $segments = explode('.', $relation_path);
+        $top = $segments[0];
+
+        if (! isset($eager_loads[$top])) {
+            $builder->with([$relation_path => $constraint]);
+
+            return;
+        }
+
+        $previous = $eager_loads[$top];
+
+        if (count($segments) === 1) {
+            $builder->with([$top => function (Relation $relation) use ($previous, $constraint): void {
+                if (is_callable($previous)) {
+                    $previous($relation);
+                }
+                $constraint($relation->getQuery());
+            }]);
+
+            return;
+        }
+
+        $nested_path = implode('.', array_slice($segments, 1));
+
+        $builder->with([$top => function (Relation $relation) use ($previous, $nested_path, $constraint): void {
+            if (is_callable($previous)) {
+                $previous($relation);
+            }
+            self::mergeEagerLoadConstraint($relation, $nested_path, $constraint);
+        }]);
+    }
+
+    /**
+     * Map operator + value to the corresponding Eloquent where*.
+     *
+     * @param  array{key: string, operator: string, value: string, path: ?string, relation_filter_mode: QueryRelationFilterTypeEnum}  $condition
+     */
+    private static function processConditionOperator(Builder $query, array $condition): void
+    {
+        $key = $condition['key'];
+        $operator = $condition['operator'];
+        $value = mb_trim($condition['value'], '<{}>');
+
+        switch (true) {
+            case $operator === '=':
+            case $operator === '!=':
+            case $operator === '>':
+            case $operator === '<':
+            case $operator === '>=':
+            case $operator === '<=':
+                $query->where($key, $operator, $value);
+                break;
+
+            case $operator === 'like':
+                $query->where($key, 'like', $value);
+                break;
+
+            case $operator === 'notLike':
+                $query->where($key, 'not like', $value);
+                break;
+
+            case $operator === 'in':
+                $arr_values = self::parseMultipleValues($value);
+                $query->whereIn($key, $arr_values);
+                break;
+
+            case $operator === 'notIn':
+                $arr_values = self::parseMultipleValues($value);
+                $query->whereNotIn($key, $arr_values);
+                break;
+
+            case $operator === 'null':
+                $query->whereNull($key);
+                break;
+
+            case $operator === 'notNull':
+                $query->whereNotNull($key);
+                break;
+
+            case $operator === 'between':
+                $arr_values = self::parseMultipleValues($value);
+                if (count($arr_values) !== 2) {
+                    throw new Exception("Operator {$condition['operator']} requires exactly two values.");
+                }
+
+                $query->whereBetween($key, $arr_values);
+                break;
+
+            case $operator === 'notBetween':
+                $arr_values = self::parseMultipleValues($value);
+                if (count($arr_values) !== 2) {
+                    throw new Exception("Operator {$condition['operator']} requires exactly two values.");
+                }
+
+                $query->whereNotBetween($key, $arr_values);
+                break;
+
+            case str_starts_with($operator, 'date,'): // solo comparará fechas sin horas
+                $real_operator = mb_substr($operator, 5);
+                $query->whereDate($key, $real_operator, $value);
+                break;
+
+            default:
+                throw new Exception("Unsupported operator: {$operator}");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // F. Result post-processing
+    // -------------------------------------------------------------------------
 
     private static function appendAttribute(Model $record, Stringable $append): void
     {
         $is_appending_main_model = $append->doesntContain('.');
 
         if ($is_appending_main_model) {
-            $attributes = $append;
-
-            $record->append($attributes->toString());
+            $record->append($append->toString());
 
             return;
         }

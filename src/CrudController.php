@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bisual\LaravelShortcuts;
 
+use Bisual\LaravelShortcuts\Helpers\ControllerValidationHelper;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
@@ -40,8 +41,10 @@ abstract class CrudController extends BaseController
 
     public static array|string $indexQueryValidations = [];
 
+    /** @var class-string<Request>|array<string, array|object|string> */
     public static $storeRequestClass = Request::class; // pot ser un array de validacions també
 
+    /** @var class-string<Request>|array<string, array|object|string> */
     public static $updateRequestClass = Request::class; // pot ser un array de validacions també
 
     public function index(Request $request, ?callable $callback = null): AnonymousResourceCollection
@@ -80,7 +83,7 @@ abstract class CrudController extends BaseController
     {
         if (is_array(static::$storeRequestClass)) {
             $data = $request->validate(static::$storeRequestClass);
-        } elseif (is_string(static::$storeRequestClass) && is_subclass_of(static::$storeRequestClass, FormRequest::class)) {
+        } elseif (is_subclass_of(static::$storeRequestClass, FormRequest::class)) {
             $data = $this->handleStoreFormRequestValidation();
         } else {
             $data = $request->all();
@@ -103,7 +106,7 @@ abstract class CrudController extends BaseController
 
         if (is_array(static::$updateRequestClass)) {
             $data = $request->validate(static::$updateRequestClass);
-        } elseif (is_string(static::$updateRequestClass) && is_subclass_of(static::$updateRequestClass, FormRequest::class)) {
+        } elseif (is_subclass_of(static::$updateRequestClass, FormRequest::class)) {
             $data = $this->handleUpdateFormRequestValidation();
         } else {
             $data = $request->all();
@@ -135,6 +138,9 @@ abstract class CrudController extends BaseController
         return response()->json((static::$repository)::destroy($item));
     }
 
+    /**
+     * @return array<string, array|bool|float|int|object|string|null>
+     */
     private function handleStoreFormRequestValidation(): array
     {
         $formRequest = app(static::$storeRequestClass);
@@ -142,6 +148,9 @@ abstract class CrudController extends BaseController
         return $this->validateWithFormRequest($formRequest, $formRequest->all());
     }
 
+    /**
+     * @return array<string, array|bool|float|int|object|string|null>
+     */
     private function handleUpdateFormRequestValidation(): array
     {
         $formRequest = app(static::$updateRequestClass);
@@ -149,6 +158,9 @@ abstract class CrudController extends BaseController
         return $this->validateWithFormRequest($formRequest, $formRequest->all());
     }
 
+    /**
+     * @return array<string, array|bool|float|int|object|string|null>
+     */
     private function handleQueryFormRequestValidation(): array
     {
         $formRequest = app(static::$indexQueryValidations);
@@ -156,6 +168,10 @@ abstract class CrudController extends BaseController
         return $this->validateWithFormRequest($formRequest, $formRequest->query());
     }
 
+    /**
+     * @param  array<string, array|bool|float|int|object|string|null>  $data
+     * @return array<string, array|bool|float|int|object|string|null>
+     */
     private function validateWithFormRequest(FormRequest $formRequest, array $data): array
     {
         $formRequest->merge($data);

@@ -1,6 +1,6 @@
 <?php
 
-namespace Bisual\LaravelShortcuts;
+namespace Bisual\LaravelShortcuts\Helpers;
 
 class Helper
 {
@@ -23,7 +23,5 @@ class Helper
 
             return $matches[0];
         }, $template);
-
-        return $template;
     }
 }
