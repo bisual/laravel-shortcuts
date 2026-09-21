@@ -278,7 +278,7 @@ final class CrudMcpActionTool extends Tool
             return Validator::make($payload, $rulesOrRequest)->validate();
         }
 
-        if (is_string($rulesOrRequest) && is_subclass_of($rulesOrRequest, FormRequest::class)) {
+        if (is_subclass_of($rulesOrRequest, FormRequest::class)) {
             return $this->validateWithFormRequest($rulesOrRequest, $payload);
         }
 

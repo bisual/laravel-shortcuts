@@ -210,8 +210,9 @@ abstract class CrudRepository
             // handling with, order_by and select
             $clause = self::getClause($params);
 
+            $model_for_search = new static::$model;
             /** @var list<string>|null $searchable_fields */
-            $searchable_fields = (new static::$model)->searchable;
+            $searchable_fields = get_object_vars($model_for_search)['searchable'] ?? null;
 
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
@@ -374,8 +375,12 @@ abstract class CrudRepository
             $id = $id['id'];
         } // per si li hem passat en array
 
-        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
-            $clause->byUUID($id);
+        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model), true)) {
+            $uuid_model = App::make(static::$model);
+            $uuid_field = method_exists($uuid_model, 'getUUIDFieldName')
+                ? $uuid_model->getUUIDFieldName()
+                : 'uuid';
+            $clause->where($uuid_field, $id);
         } else {
             $clause->where(App::make(static::$model)->getKeyName(), $id);
         }
@@ -421,7 +426,7 @@ abstract class CrudRepository
         $model = self::show($model);
 
         if ($callback !== null) {
-            $callback($model->id);
+            $callback($model->getKey());
         }
 
         $model->delete();
@@ -472,7 +477,7 @@ abstract class CrudRepository
     /**
      * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
      */
-    private static function handleWithOrderByAndSelect(Builder &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
+    private static function handleWithOrderByAndSelect(Builder $clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
     {
         $struct = self::getParamsStructure($with, $order_by, $select, $with_constraints);
         self::processParamsStructure($clause, $struct);
@@ -501,7 +506,7 @@ abstract class CrudRepository
      *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
      * }  $struct
      */
-    private static function processParamsStructure(Builder|Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    private static function processParamsStructure(Builder|Relation $clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
         if (! empty($struct['select'])) {
@@ -754,11 +759,16 @@ abstract class CrudRepository
         $constraints = [];
 
         foreach ($params as $attr => $val) {
-            if (! is_string($attr) || ! str_contains($attr, '.')) {
+            if (! str_contains($attr, '.')) {
                 continue;
             }
 
             $last_dot = strrpos($attr, '.');
+
+            if ($last_dot === false) {
+                continue;
+            }
+
             $relation_path = substr($attr, 0, $last_dot);
             $attribute = substr($attr, $last_dot + 1);
 
