@@ -1,12 +1,10 @@
-name: PHPStan
+name: Pint
 
 on:
   push:
     branches: [main]
     paths:
       - '**.php'
-      - 'phpstan.neon.dist'
-      - 'composer.json'
   pull_request:
     branches: [main]
     types:
@@ -16,22 +14,22 @@ on:
       - ready_for_review
     paths:
       - '**.php'
-      - 'phpstan.neon.dist'
-      - 'composer.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  phpstan:
-    name: phpstan
+  lint:
+    name: Pint
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'push' ||
       github.event.pull_request.draft == false
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -42,5 +40,5 @@ jobs:
       - name: Install composer dependencies
         uses: ramsey/composer-install@v3
 
-      - name: Run PHPStan
-        run: ./vendor/bin/phpstan analyse --memory-limit=512M --error-format=github
+      - name: Run Pint
+        run: vendor/bin/pint --test
