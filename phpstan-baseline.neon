@@ -7,15 +7,9 @@ parameters:
 			path: src/CrudRepository.php
 
 		-
-			message: '#^Method Bisual\\LaravelShortcuts\\CrudRepository\:\:getClause\(\) should return Illuminate\\Database\\Eloquent\\Builder\<TModel of Illuminate\\Database\\Eloquent\\Model\> but returns Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\.$#'
+			message: '#^Method Bisual\\LaravelShortcuts\\CrudRepository\:\:newQuery\(\) should return Illuminate\\Database\\Eloquent\\Builder\<TModel of Illuminate\\Database\\Eloquent\\Model\> but returns Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\.$#'
 			identifier: return.type
 			count: 1
-			path: src/CrudRepository.php
-
-		-
-			message: '#^Method Bisual\\LaravelShortcuts\\CrudRepository\:\:index\(\) should return Illuminate\\Pagination\\LengthAwarePaginator\<int, TModel of Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Support\\Collection\<int, TModel of Illuminate\\Database\\Eloquent\\Model\> but returns Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Pagination\\LengthAwarePaginator\<int, Illuminate\\Database\\Eloquent\\Model\>\.$#'
-			identifier: return.type
-			count: 2
 			path: src/CrudRepository.php
 
 		-

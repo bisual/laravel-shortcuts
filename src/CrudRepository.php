@@ -338,17 +338,22 @@ abstract class CrudRepository
                 }
             }
 
+            /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> $data */
             return $data;
         } elseif (is_callable($callback)) {
-            $clause = (static::$model)::query();
+            $clause = self::newQuery();
             $callback($clause, $params);
 
+            /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> */
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
 
+        $clause = self::newQuery();
+
+        /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> */
         return $paginate
-            ? (static::$model)::query()->paginate($perPage, ['*'], 'page', $page)
-            : (static::$model)::query()->get();
+            ? $clause->paginate($perPage, ['*'], 'page', $page)
+            : $clause->get();
     }
 
     /**
@@ -440,9 +445,7 @@ abstract class CrudRepository
      */
     protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): Builder
     {
-        $clause = $withoutGlobalScopes
-            ? (static::$model)::query()->withoutGlobalScopes()
-            : (static::$model)::query();
+        $clause = self::newQuery($withoutGlobalScopes);
 
         // With
         $with = null;
@@ -472,6 +475,19 @@ abstract class CrudRepository
         }
 
         return $clause;
+    }
+
+    /**
+     * @return Builder<TModel>
+     */
+    protected static function newQuery(bool $withoutGlobalScopes = false): Builder
+    {
+        /** @var class-string<TModel> $model */
+        $model = static::$model;
+
+        return $withoutGlobalScopes
+            ? $model::query()->withoutGlobalScopes()
+            : $model::query();
     }
 
     /**
@@ -759,7 +775,7 @@ abstract class CrudRepository
         $constraints = [];
 
         foreach ($params as $attr => $val) {
-            if (! str_contains($attr, '.')) {
+            if (! str_contains($attr, '.') || str_ends_with($attr, '.')) {
                 continue;
             }
 
@@ -772,7 +788,7 @@ abstract class CrudRepository
             $relation_path = substr($attr, 0, $last_dot);
             $attribute = substr($attr, $last_dot + 1);
 
-            if ($attribute === '' || ! isset($relation_paths[$relation_path])) {
+            if (! isset($relation_paths[$relation_path])) {
                 continue;
             }
 
@@ -872,9 +888,7 @@ abstract class CrudRepository
         $attribute = array_pop($parts);
         $relation = implode($separator, $parts);
 
-        $is_invalid_relation_filter = $attribute === '' || $relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null;
-
-        if ($is_invalid_relation_filter) {
+        if ($relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null) {
             return null;
         }
 
