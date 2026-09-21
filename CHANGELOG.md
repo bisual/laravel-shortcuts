@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- `CrudRepository::parameterDefinitions()` / `indexValidationRules()` / `showValidationRules()` documenting reserved index/show params (shared with HTTP validation and MCP schemas). Removed `ControllerValidationHelper` in favor of calling `CrudRepository::indexValidationRules()` directly.
+- `CrudMcpResource` + `CrudMcpActionTool` to expose CRUD over Laravel MCP with Policy authorization. Supports `$extraTools` and `$parameterDefinitionOverrides`.
+- Artisan commands `make:mcp-crud-resource`, `make:mcp-tool`, and `make:bisual-resource --mcp`.
+
 ## v1.4.0 - 2026-09-16
 
 ### What's Changed

@@ -51,7 +51,7 @@ abstract class CrudController extends BaseController
         }
 
         if (is_array(static::$indexQueryValidations) && count(static::$indexQueryValidations) > 0) {
-            $params = Validator::make($request->query(), ControllerValidationHelper::indexQueryParametersValidation(static::$indexQueryValidations))->validate();
+            $params = Validator::make($request->query(), CrudRepository::indexValidationRules(static::$indexQueryValidations))->validate();
         } elseif (is_string(static::$indexQueryValidations) && is_subclass_of(static::$indexQueryValidations, FormRequest::class)) {
             $params = $this->handleQueryFormRequestValidation();
         } else {

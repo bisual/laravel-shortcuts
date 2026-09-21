@@ -1,8 +1,8 @@
 # Laravel Shortcuts for Software Agencies
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/bisual/laravel-shortcuts.svg?style=flat-square)](https://packagist.org/packages/bisual/laravel-shortcuts)
-[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/bisual/laravel-shortcuts/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/bisual/laravel-shortcuts/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/bisual/laravel-shortcuts/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/bisual/laravel-shortcuts/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/bisual/laravel-shortcuts/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/bisual/laravel-shortcuts/actions?query=workflow%3ATests+branch%3Amain)
+[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/bisual/laravel-shortcuts/pint.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/bisual/laravel-shortcuts/actions?query=workflow%3APint+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/bisual/laravel-shortcuts.svg?style=flat-square)](https://packagist.org/packages/bisual/laravel-shortcuts)
 
 This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
@@ -43,7 +43,7 @@ php artisan vendor:publish --tag="laravel-shortcuts-views"
 
 ## Artisan generators
 
-The package registers generators for repositories, DTOs, form requests, and a resource bundle. Generated PHP lives under the usual Laravel `App\` namespaces. Controllers go to `App\Http\Controllers\API`.
+The package registers generators for repositories, DTOs, form requests, MCP tools, and a resource bundle. Generated PHP lives under the usual Laravel `App\` namespaces. Controllers go to `App\Http\Controllers\API`.
 
 ### `make:repository`
 
@@ -72,12 +72,30 @@ Creates a matching DTO and a form request in `app/Http/Requests`. `RegisterUser`
 php artisan make:request-dto RegisterUser
 ```
 
+### `make:mcp-crud-resource`
+
+Requires [`laravel/mcp`](https://github.com/laravel/mcp). Creates `app/Mcp/Cruds/{Name}CrudMcp.php` extending `CrudMcpResource`.
+
+```bash
+php artisan make:mcp-crud-resource Post
+php artisan make:mcp-crud-resource Post --model=Post --repository=PostRepository
+```
+
+### `make:mcp-tool`
+
+Requires `laravel/mcp`. Creates a standalone custom tool in `app/Mcp/Tools`.
+
+```bash
+php artisan make:mcp-tool ResolveTaskByCode --description="Resolve a product task by code or git branch"
+```
+
 ### `make:bisual-resource`
 
 Scaffolds an Eloquent model and optional companions. The name is the model (`Post`). If the model already exists, the command fails.
 
 ```bash
 php artisan make:bisual-resource Post -crfspd
+php artisan make:bisual-resource Post -cr --mcp
 ```
 
 If you omit the name or flags, Laravel Prompts asks for the model name and which components to generate.
@@ -91,7 +109,8 @@ If you omit the name or flags, Laravel Prompts asks for the model name and which
 | `-p` | `--policy` | Laravel policy for the model |
 | `-d` | `--dto` | `StorePostDTO` and `UpdatePostDTO` |
 | `-m` | `--migration` | Laravel migration |
-| `-a` | `--all` | All of the above |
+| | `--mcp` | `App\Mcp\Cruds\PostCrudMcp` |
+| `-a` | `--all` | All of the above (including `--mcp`) |
 
 Factory, seeder, policy, migration, and the model itself are delegated to Laravel's `make:*` commands.
 
@@ -103,6 +122,73 @@ public static $updateRequestClass = UpdatePostRequest::class;
 ```
 
 With `-c` and no `-d`, those properties are empty arrays (a minimal CRUD controller). Routes are not registered automatically.
+
+## MCP CRUD (`CrudMcpResource`)
+
+Optional integration with [Laravel MCP](https://github.com/laravel/mcp). Install it in the app:
+
+```bash
+composer require laravel/mcp
+```
+
+Declare a resource the same way you declare a `CrudController`, then spread `::tools()` into your MCP server:
+
+```php
+namespace App\Mcp\Cruds;
+
+use App\Models\CompanyProduct;
+use App\Repositories\CompanyProductRepository;
+use Bisual\LaravelShortcuts\Mcp\CrudMcpResource;
+use Illuminate\Contracts\Auth\Authenticatable;
+
+final class CompanyProductCrudMcp extends CrudMcpResource
+{
+    public static string $model = CompanyProduct::class;
+    public static string $repository = CompanyProductRepository::class;
+
+    public static ?array $only = ['index', 'show']; // which tools to register
+
+    public static array $abilities = [
+        'index' => 'index', // Policy uses index instead of viewAny
+    ];
+
+    public static function prepareIndexParams(array &$params, Authenticatable $user): void
+    {
+        // e.g. force a scope
+    }
+}
+```
+
+```php
+use App\Mcp\Cruds\CompanyProductCrudMcp;
+use App\Mcp\Cruds\ProductTaskCrudMcp;
+use Laravel\Mcp\Server;
+
+final class BisualServer extends Server
+{
+    protected function boot(): void
+    {
+        $this->tools = [
+            ...CompanyProductCrudMcp::tools(),
+            ...ProductTaskCrudMcp::tools(),
+        ];
+    }
+}
+```
+
+| Property | Role |
+| --- | --- |
+| `$model` / `$repository` | Same as `CrudController` |
+| `$only` / `$except` | Which actions become MCP tools (`index`, `show`, `store`, `update`, `destroy`) |
+| `$authorize` | Whether each action calls the model Policy |
+| `$abilities` | Map action → Gate ability (defaults: `viewAny`, `view`, `create`, `update`, `delete`) |
+| `$indexQueryValidations` | Extra index rules (merged with the CrudRepository catalog) |
+| `$storeRequestClass` / `$updateRequestClass` | Array rules or FormRequest class |
+| `$descriptions` | Optional tool description overrides per action |
+| `$extraTools` | Extra standalone tool classes mixed into `::tools()` |
+| `prepareIndexParams` / `prepareStoreData` / `prepareUpdateData` | Hooks before the repository call |
+
+Tool input schemas are built from `CrudRepository::parameterDefinitions()` (the reserved params `index` / `show` already understand), so LLMs see the same dialect as the HTTP API: `with`, `order_by`, `page`, `per_page`, `limit`, `scopes`, `search`, `append`, `without`, `select`, plus `id` for show/update/destroy. Additional column filters can still be passed through on index (same as the repository).
 
 ## Custom query params usage
 

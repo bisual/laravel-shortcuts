@@ -24,8 +24,170 @@ use Illuminate\Support\Stringable;
  */
 abstract class CrudRepository
 {
+    public const ACTION_INDEX = 'index';
+
+    public const ACTION_SHOW = 'show';
+
+    public const ACTION_STORE = 'store';
+
+    public const ACTION_UPDATE = 'update';
+
+    public const ACTION_DESTROY = 'destroy';
+
     /** @var class-string<TModel> */
     public static $model = Model::class;
+
+    /**
+     * Reserved query / tool parameters understood by {@see index()} / {@see show()}.
+     *
+     * Used by HTTP validation and MCP tool schemas.
+     *
+     * @return array<string, array{
+     *     actions: list<string>,
+     *     type: 'string'|'integer',
+     *     validation: string,
+     *     description: string,
+     *     required: bool
+     * }>
+     */
+    public static function parameterDefinitions(): array
+    {
+        return [
+            'search' => [
+                'actions' => [self::ACTION_INDEX],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Search term applied to the model $searchable fields (LIKE).',
+                'required' => false,
+            ],
+            'with' => [
+                'actions' => [self::ACTION_INDEX, self::ACTION_SHOW],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Eager-load relations, comma-separated. Use ".." for nested depth (e.g. company,members..user).',
+                'required' => false,
+            ],
+            'without' => [
+                'actions' => [self::ACTION_INDEX, self::ACTION_SHOW],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Skip default eager loads, comma-separated relation names.',
+                'required' => false,
+            ],
+            'append' => [
+                'actions' => [self::ACTION_INDEX, self::ACTION_SHOW],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Model appends (accessors), comma-separated.',
+                'required' => false,
+            ],
+            'order_by' => [
+                'actions' => [self::ACTION_INDEX],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Order clause, e.g. created_at:desc or relation..field:asc. Multiple orders comma-separated.',
+                'required' => false,
+            ],
+            'order_by_direction' => [
+                'actions' => [self::ACTION_INDEX],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Legacy sort direction. Prefer embedding :asc|:desc in order_by instead.',
+                'required' => false,
+            ],
+            'page' => [
+                'actions' => [self::ACTION_INDEX],
+                'type' => 'integer',
+                'validation' => 'integer|nullable',
+                'description' => 'Page number when paginating. Presence of page or per_page enables pagination.',
+                'required' => false,
+            ],
+            'per_page' => [
+                'actions' => [self::ACTION_INDEX],
+                'type' => 'integer',
+                'validation' => 'integer|nullable',
+                'description' => 'Page size when paginating (default 15).',
+                'required' => false,
+            ],
+            'limit' => [
+                'actions' => [self::ACTION_INDEX],
+                'type' => 'integer',
+                'validation' => 'integer|nullable',
+                'description' => 'Max rows when not paginating.',
+                'required' => false,
+            ],
+            'scopes' => [
+                'actions' => [self::ACTION_INDEX],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Local Eloquent scopes as CSV, optional args after colon (e.g. active,forUser:12).',
+                'required' => false,
+            ],
+            'select' => [
+                'actions' => [self::ACTION_INDEX, self::ACTION_SHOW],
+                'type' => 'string',
+                'validation' => 'string|nullable',
+                'description' => 'Columns to select. Nested relation fields with ".." and "|" for multiple fields.',
+                'required' => false,
+            ],
+            'id' => [
+                'actions' => [self::ACTION_SHOW, self::ACTION_UPDATE, self::ACTION_DESTROY],
+                'type' => 'string',
+                'validation' => 'required',
+                'description' => 'Primary key (numeric id or UUID when the model uses HasUuid).',
+                'required' => true,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, array{
+     *     actions: list<string>,
+     *     type: 'string'|'integer',
+     *     validation: string,
+     *     description: string,
+     *     required: bool
+     * }>
+     */
+    public static function parameterDefinitionsForAction(string $action): array
+    {
+        return array_filter(
+            static::parameterDefinitions(),
+            static fn (array $definition): bool => in_array($action, $definition['actions'], true),
+        );
+    }
+
+    /**
+     * Validation rules for index query params (HTTP Controllers + MCP index tools).
+     *
+     * @param  array<string, string|array<int, string>>  $extra
+     * @return array<string, string|array<int, string>>
+     */
+    public static function indexValidationRules(array $extra = []): array
+    {
+        $rules = [];
+
+        foreach (static::parameterDefinitionsForAction(self::ACTION_INDEX) as $name => $definition) {
+            $rules[$name] = $definition['validation'];
+        }
+
+        return array_merge($rules, $extra);
+    }
+
+    /**
+     * @param  array<string, string|array<int, string>>  $extra
+     * @return array<string, string|array<int, string>>
+     */
+    public static function showValidationRules(array $extra = []): array
+    {
+        $rules = [];
+
+        foreach (static::parameterDefinitionsForAction(self::ACTION_SHOW) as $name => $definition) {
+            $rules[$name] = $definition['validation'];
+        }
+
+        return array_merge($rules, $extra);
+    }
 
     /**
      * @param  array<string, int|string|bool|BackedEnum|null>  $params
@@ -48,8 +210,9 @@ abstract class CrudRepository
             // handling with, order_by and select
             $clause = self::getClause($params);
 
+            $model_for_search = new static::$model;
             /** @var list<string>|null $searchable_fields */
-            $searchable_fields = (new static::$model)->searchable;
+            $searchable_fields = get_object_vars($model_for_search)['searchable'] ?? null;
 
             $search = null;
             if (isset($params['search']) && $searchable_fields !== null && count($searchable_fields) > 0) {
@@ -175,17 +338,22 @@ abstract class CrudRepository
                 }
             }
 
+            /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> $data */
             return $data;
         } elseif (is_callable($callback)) {
-            $clause = (static::$model)::query();
+            $clause = self::newQuery();
             $callback($clause, $params);
 
+            /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> */
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
 
+        $clause = self::newQuery();
+
+        /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> */
         return $paginate
-            ? (static::$model)::query()->paginate($perPage, ['*'], 'page', $page)
-            : (static::$model)::query()->get();
+            ? $clause->paginate($perPage, ['*'], 'page', $page)
+            : $clause->get();
     }
 
     /**
@@ -212,8 +380,12 @@ abstract class CrudRepository
             $id = $id['id'];
         } // per si li hem passat en array
 
-        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model))) {
-            $clause->byUUID($id);
+        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model), true)) {
+            $uuid_model = App::make(static::$model);
+            $uuid_field = method_exists($uuid_model, 'getUUIDFieldName')
+                ? $uuid_model->getUUIDFieldName()
+                : 'uuid';
+            $clause->where($uuid_field, $id);
         } else {
             $clause->where(App::make(static::$model)->getKeyName(), $id);
         }
@@ -259,7 +431,7 @@ abstract class CrudRepository
         $model = self::show($model);
 
         if ($callback !== null) {
-            $callback($model->id);
+            $callback($model->getKey());
         }
 
         $model->delete();
@@ -273,9 +445,7 @@ abstract class CrudRepository
      */
     protected static function getClause(array &$params = [], bool $withoutGlobalScopes = false): Builder
     {
-        $clause = $withoutGlobalScopes
-            ? (static::$model)::query()->withoutGlobalScopes()
-            : (static::$model)::query();
+        $clause = self::newQuery($withoutGlobalScopes);
 
         // With
         $with = null;
@@ -308,9 +478,22 @@ abstract class CrudRepository
     }
 
     /**
+     * @return Builder<TModel>
+     */
+    protected static function newQuery(bool $withoutGlobalScopes = false): Builder
+    {
+        /** @var class-string<TModel> $model */
+        $model = static::$model;
+
+        return $withoutGlobalScopes
+            ? $model::query()->withoutGlobalScopes()
+            : $model::query();
+    }
+
+    /**
      * @param  array<string, list<array{attribute: string, value: int|string|bool|BackedEnum|null}>>  $with_constraints
      */
-    private static function handleWithOrderByAndSelect(Builder &$clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
+    private static function handleWithOrderByAndSelect(Builder $clause, ?string $with = null, ?string $order_by = null, ?string $select = null, array $with_constraints = []): void
     {
         $struct = self::getParamsStructure($with, $order_by, $select, $with_constraints);
         self::processParamsStructure($clause, $struct);
@@ -339,7 +522,7 @@ abstract class CrudRepository
      *     constraints?: list<array{attribute: string, value: int|string|bool|BackedEnum|null}>
      * }  $struct
      */
-    private static function processParamsStructure(Builder|Relation &$clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
+    private static function processParamsStructure(Builder|Relation $clause, array $struct, ?Model $parent_model = null, ?string $relation = null): void
     {
         // SELECT
         if (! empty($struct['select'])) {
@@ -592,15 +775,20 @@ abstract class CrudRepository
         $constraints = [];
 
         foreach ($params as $attr => $val) {
-            if (! is_string($attr) || ! str_contains($attr, '.')) {
+            if (! str_contains($attr, '.') || str_ends_with($attr, '.')) {
                 continue;
             }
 
             $last_dot = strrpos($attr, '.');
+
+            if ($last_dot === false) {
+                continue;
+            }
+
             $relation_path = substr($attr, 0, $last_dot);
             $attribute = substr($attr, $last_dot + 1);
 
-            if ($attribute === '' || ! isset($relation_paths[$relation_path])) {
+            if (! isset($relation_paths[$relation_path])) {
                 continue;
             }
 
@@ -700,9 +888,7 @@ abstract class CrudRepository
         $attribute = array_pop($parts);
         $relation = implode($separator, $parts);
 
-        $is_invalid_relation_filter = $attribute === '' || $relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null;
-
-        if ($is_invalid_relation_filter) {
+        if ($relation === '' || self::getRelation($model, explode('.', $relation)[0]) === null) {
             return null;
         }
 

@@ -17,11 +17,12 @@ class BisualResourceMakeCommand extends Command
 {
     protected $signature = 'make:bisual-resource
         {name? : The name of the model}
-        {--a|all : Generate a controller, repository, factory, seeder, policy, DTOs, and migration}
+        {--a|all : Generate a controller, repository, factory, seeder, policy, DTOs, migration, and MCP CRUD resource}
         {--c|controller : Create a new CRUD API controller}
         {--d|dto : Create Store and Update DTO classes}
         {--f|factory : Create a new factory for the model}
         {--m|migration : Create a new migration file for the model}
+        {--mcp : Create a CrudMcpResource for Laravel MCP}
         {--p|policy : Create a new policy for the model}
         {--r|repository : Create a new repository for the model}
         {--s|seeder : Create a new seeder for the model}';
@@ -72,6 +73,10 @@ class BisualResourceMakeCommand extends Command
 
         if ($this->option('policy')) {
             $this->createPolicy();
+        }
+
+        if ($this->option('mcp')) {
+            $this->createMcpCrudResource();
         }
 
         if ($this->wasPrompted) {
@@ -142,13 +147,17 @@ class BisualResourceMakeCommand extends Command
             $command .= ' -'.$flags;
         }
 
+        if ($this->option('mcp')) {
+            $command .= ' --mcp';
+        }
+
         $this->newLine();
         $this->comment("🤓 Next time you could do: {$command}");
     }
 
     protected function enableAllComponents(): void
     {
-        foreach (['controller', 'repository', 'factory', 'seeder', 'policy', 'dto', 'migration'] as $option) {
+        foreach (['controller', 'repository', 'factory', 'seeder', 'policy', 'dto', 'migration', 'mcp'] as $option) {
             $this->input->setOption($option, true);
         }
     }
@@ -164,7 +173,7 @@ class BisualResourceMakeCommand extends Command
 
     protected function hasComponentOptions(): bool
     {
-        foreach (['controller', 'repository', 'factory', 'seeder', 'policy', 'dto', 'migration', 'all'] as $option) {
+        foreach (['controller', 'repository', 'factory', 'seeder', 'policy', 'dto', 'migration', 'mcp', 'all'] as $option) {
             if ($this->option($option)) {
                 return true;
             }
@@ -187,6 +196,7 @@ class BisualResourceMakeCommand extends Command
                 'policy' => 'Policy',
                 'dto' => 'DTOs',
                 'migration' => 'Migration',
+                'mcp' => 'MCP CRUD resource',
             ],
         )))->each(fn (string $option) => $this->input->setOption($option, true));
     }
@@ -318,6 +328,15 @@ class BisualResourceMakeCommand extends Command
         $this->call('make:policy', [
             'name' => $this->modelBasename().'Policy',
             '--model' => $this->qualifyModel($this->modelName()),
+        ]);
+    }
+
+    protected function createMcpCrudResource(): void
+    {
+        $this->call('make:mcp-crud-resource', [
+            'name' => $this->modelBasename(),
+            '--model' => $this->qualifyModel($this->modelName()),
+            '--repository' => $this->repositoryClass(),
         ]);
     }
 

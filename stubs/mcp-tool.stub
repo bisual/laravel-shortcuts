@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('{{ description }}')]
+final class {{ class }} extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $user = $request->user();
+
+        if ($user === null) {
+            return Response::error('Unauthenticated.');
+        }
+
+        //
+
+        return Response::text('OK');
+    }
+
+    /**
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     */
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            // 'example' => $schema->string()->description('…')->required(),
+        ];
+    }
+}
