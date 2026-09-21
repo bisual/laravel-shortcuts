@@ -2,6 +2,19 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.5.0 - 2026-09-21
+
+### What's Changed
+
+* chore(deps): bump aglipanci/laravel-pint-action from 2.3.1 to 2.6 by @dependabot[bot] in https://github.com/bisual/laravel-shortcuts/pull/27
+* feat: add MCP CRUD support and validation enhancements by @polribas14 in https://github.com/bisual/laravel-shortcuts/pull/28
+
+### New Contributors
+
+* @polribas14 made their first contribution in https://github.com/bisual/laravel-shortcuts/pull/28
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.4.0...v1.5.0
+
 ## Unreleased
 
 ### Added
