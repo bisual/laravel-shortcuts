@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespacedModel }};
+use {{ namespacedRepository }};
+use Bisual\LaravelShortcuts\Mcp\CrudMcpResource;
+use Illuminate\Contracts\Auth\Authenticatable;
+
+/**
+ * @extends CrudMcpResource<{{ model }}, {{ repository }}>
+ */
+final class {{ class }} extends CrudMcpResource
+{
+    public static string $repository = {{ repository }}::class;
+
+    public static string $model = {{ model }}::class;
+
+    /** @var list<string>|null Restrict which CRUD tools are registered (null = all). */
+    public static ?array $only = ['index', 'show'];
+
+    /**
+     * Standalone tools registered with this resource (in addition to CRUD actions).
+     *
+     * @var list<class-string<\Laravel\Mcp\Server\Tool>>
+     */
+    public static array $extraTools = [
+        // SomeCustomTool::class,
+    ];
+
+    /**
+     * Override Gate abilities when the Policy does not use viewAny/view/create/update/delete.
+     *
+     * @var array<string, string>
+     */
+    public static array $abilities = [
+        // 'index' => 'index',
+    ];
+
+    /**
+     * @param  array<string, mixed>  $params
+     */
+    public static function prepareIndexParams(array &$params, Authenticatable $user): void
+    {
+        //
+    }
+}

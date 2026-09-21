@@ -1,24 +1,20 @@
 # laravel-shortcuts Documentation
-## Installation
 
-You can install the package via composer:
+## Installation
 
 ```bash
 composer require bisual/laravel-shortcuts
 ```
 
-You can publish and run the migrations with:
+For MCP CRUD helpers, also install Laravel MCP:
 
 ```bash
-php artisan vendor:publish --tag="laravel-shortcuts-migrations"
-php artisan migrate
+composer require laravel/mcp
 ```
 
-You can publish the config file with:
+## MCP CRUD
 
-```bash
-php artisan vendor:publish --tag="laravel-shortcuts-config"
-```
+See the package [README](../README.md#mcp-crud-crudmcpresource) for `CrudMcpResource`, parameter catalog, and generators (`make:mcp-crud-resource`, `make:mcp-tool`, `make:bisual-resource --mcp`).
 
 ## Testing
 
