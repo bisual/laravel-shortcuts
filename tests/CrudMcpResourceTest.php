@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Bisual\LaravelShortcuts\CrudRepository;
 use Bisual\LaravelShortcuts\Mcp\CrudMcpActionTool;
+use Bisual\LaravelShortcuts\Mcp\CrudMcpResource;
+use Bisual\LaravelShortcuts\Mcp\CrudQueryGuideTool;
 use Bisual\LaravelShortcuts\Tests\Fixtures\FakeCrudMcpResource;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\JsonSchema as JsonSchemaFactory;
@@ -24,13 +26,28 @@ it('respects only when building enabled actions', function (): void {
         ->and(FakeCrudMcpResource::abilityFor('show'))->toBe('view');
 });
 
-it('builds mcp tools from the resource', function (): void {
+it('builds mcp tools from the resource including query guide once', function (): void {
     $tools = FakeCrudMcpResource::tools();
 
-    expect($tools)->toHaveCount(2)
-        ->and($tools[0])->toBeInstanceOf(CrudMcpActionTool::class)
-        ->and($tools[0]->name())->toBe('fake-model-index')
-        ->and($tools[1]->name())->toBe('fake-model-show');
+    expect($tools)->toHaveCount(3)
+        ->and($tools[0])->toBe(CrudQueryGuideTool::class)
+        ->and($tools[1])->toBeInstanceOf(CrudMcpActionTool::class)
+        ->and($tools[1]->name())->toBe('fake-model-index')
+        ->and($tools[2]->name())->toBe('fake-model-show');
+});
+
+it('toolsFrom registers the query guide only once for multiple resources', function (): void {
+    $tools = CrudMcpResource::toolsFrom([
+        FakeCrudMcpResource::class,
+        FakeCrudMcpResource::class,
+    ]);
+
+    $guide_count = collect($tools)
+        ->filter(fn (mixed $tool): bool => $tool === CrudQueryGuideTool::class)
+        ->count();
+
+    expect($guide_count)->toBe(1)
+        ->and($tools)->toHaveCount(5);
 });
 
 it('documents catalog params on the index tool schema', function (): void {

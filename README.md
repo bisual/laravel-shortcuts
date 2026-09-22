@@ -162,6 +162,7 @@ final class CompanyProductCrudMcp extends CrudMcpResource
 ```php
 use App\Mcp\Cruds\CompanyProductCrudMcp;
 use App\Mcp\Cruds\ProductTaskCrudMcp;
+use Bisual\LaravelShortcuts\Mcp\CrudMcpResource;
 use Laravel\Mcp\Server;
 
 final class BisualServer extends Server
@@ -169,12 +170,16 @@ final class BisualServer extends Server
     protected function boot(): void
     {
         $this->tools = [
-            ...CompanyProductCrudMcp::tools(),
-            ...ProductTaskCrudMcp::tools(),
+            ...CrudMcpResource::toolsFrom([
+                CompanyProductCrudMcp::class,
+                ProductTaskCrudMcp::class,
+            ]),
         ];
     }
 }
 ```
+
+`toolsFrom()` (and `::tools()` for a single resource) **auto-registers** `crud-query-guide` once: the shared CrudRepository dialect (`with` / WHERE / scopes / append). Each `*-index` / `*-show` tool only lists the model catalog (allowed relations, scopes, filters) and points to that guide.
 
 | Property | Role |
 | --- | --- |
@@ -185,10 +190,76 @@ final class BisualServer extends Server
 | `$indexQueryValidations` | Extra index rules (merged with the CrudRepository catalog) |
 | `$storeRequestClass` / `$updateRequestClass` | Array rules or FormRequest class |
 | `$descriptions` | Optional tool description overrides per action |
+| `$mcp_relation_depth` | Depth of relation tree documented for LLMs on index/show (default `2`). Nesting is limited to roots in `$mcp_with` when set |
+| `$mcp_with` | Allowlist of eager-load relation roots **or nested paths** with `..` for MCP (`null` = auto-discover, `[]` = none). Nested entries are documented as-is; enforcement allows any nesting under an allowed root. |
+| `$mcp_scopes` | Allowlist of local scopes the client may pass (`null` = auto, `[]` = none; hooks may still inject after enforcement) |
+| `$mcp_filterable` | Allowlist of column filters on index (`null` = fillable/casts/key, `[]` = none) |
+| `$rateLimitMaxAttempts` / `$rateLimitDecaySeconds` | Optional rate limit for CRUD MCP tools (`null` = off) |
 | `$extraTools` | Extra standalone tool classes mixed into `::tools()` |
 | `prepareIndexParams` / `prepareStoreData` / `prepareUpdateData` | Hooks before the repository call |
+| `enforceMcpQueryAllowlists` | Rejects `with` / `scopes` / filters outside the allowlists (runs before `prepareIndexParams`) |
 
-Tool input schemas are built from `CrudRepository::parameterDefinitions()` (the reserved params `index` / `show` already understand), so LLMs see the same dialect as the HTTP API: `with`, `order_by`, `page`, `per_page`, `limit`, `scopes`, `search`, `append`, `without`, `select`, plus `id` for show/update/destroy. Additional column filters can still be passed through on index (same as the repository).
+Tool input schemas are built from `CrudRepository::parameterDefinitions()` (the reserved params `index` / `show` already understand), so LLMs see the same dialect as the HTTP API: `with`, `order_by`, `page`, `per_page`, `limit`, `scopes`, `search`, `append`, `without`, `select`, plus `id` for show/update/destroy. Additional column filters can still be passed through on index (same as the repository), constrained by `$mcp_filterable` when set.
+
+Index/show tool **descriptions** list only the model catalog (relations / scopes / filters / searchable) and point to `crud-query-guide` for syntax. Prefer `CrudMcpResource::toolsFrom([...])` so the guide is registered once when exposing several resources.
+
+Example allowlists:
+
+```php
+final class CompanyProductCrudMcp extends CrudMcpResource
+{
+    public static ?array $mcp_with = [
+        'company',
+        'company_product_phases',
+        'company_product_phases..company_product_phase_boards',
+        'company_product_phases..company_product_phase_boards..company_product_phase_board_cols',
+    ];
+    public static ?array $mcp_scopes = ['isActive'];
+    public static ?array $mcp_filterable = ['id', 'title', 'code', 'company_id'];
+    public static int $mcp_relation_depth = 1;
+}
+```
+
+### Custom authenticated tools
+
+For non-CRUD tools, extend `Bisual\LaravelShortcuts\Mcp\AuthenticatedMcpTool`:
+
+```php
+use Bisual\LaravelShortcuts\Mcp\AuthenticatedMcpTool;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+
+final class CompanyChatSearchTool extends AuthenticatedMcpTool
+{
+    protected ?int $rateLimitMaxAttempts = 30;
+
+    protected function rules(): array
+    {
+        return ['company_product_id' => 'required|integer|exists:company_products,id'];
+    }
+
+    protected function authorize(Request $request, Authenticatable $user, array $validated): void
+    {
+        // Gate::authorize(...) or throw AuthorizationException
+    }
+
+    protected function run(Request $request, Authenticatable $user, array $validated): Response
+    {
+        return Response::json([/* ... */]);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'company_product_id' => $schema->integer()->required(),
+        ];
+    }
+}
+```
+
+The pipeline is: authenticate → rate limit → validate `rules()` → `authorize()` → `run()`, with shared mapping of `AuthorizationException` / `ValidationException` / `Throwable` to `Response::error`. CRUD tools use the same pipeline under the hood.
 
 ## Custom query params usage
 
