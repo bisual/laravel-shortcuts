@@ -6,7 +6,10 @@ All notable changes to `laravel-shortcuts` will be documented in this file.
 
 ### Added
 
-- `CrudRepository::parameterDefinitions()` / `indexValidationRules()` / `showValidationRules()` documenting reserved index/show params (shared with HTTP validation and MCP schemas). Removed `ControllerValidationHelper` in favor of calling `CrudRepository::indexValidationRules()` directly.
+- `AuthenticatedMcpTool` + `HandlesMcpToolRequest` for shared MCP auth / rate-limit / validation / authorize / error mapping. Custom tools extend `AuthenticatedMcpTool`; `CrudMcpActionTool` uses the same pipeline.
+- `ModelMcpQueryGuide` introspects Eloquent models (relations with depth, appends, filterable attributes, scopes, searchable) and documents the CrudRepository WHERE/`with`/`append`/`scopes` dialect for LLMs. CRUD index/show tool descriptions and schema fields are enriched automatically (`$mcp_relation_depth`, optional `$rateLimitMaxAttempts` on `CrudMcpResource`).
+- `CrudQueryGuideTool` (`crud-query-guide`) auto-registered once via `CrudMcpResource::tools()` / `toolsFrom()` with the shared WHERE/`with`/`scopes`/`append` dialect. Index/show descriptions keep only the model catalog and link to that tool.
+- `CrudMcpResource` MCP allowlists: `$mcp_with`, `$mcp_scopes`, `$mcp_filterable` (`null` = auto-discover, array = document + enforce via `enforceMcpQueryAllowlists()` before `prepareIndexParams`). `$mcp_with` accepts nested paths with `..` for documentation (e.g. `phases..boards`); enforcement allows nesting under any allowed root.- `CrudRepository::parameterDefinitions()` / `indexValidationRules()` / `showValidationRules()` documenting reserved index/show params (shared with HTTP validation and MCP schemas). Removed `ControllerValidationHelper` in favor of calling `CrudRepository::indexValidationRules()` directly.
 - `CrudMcpResource` + `CrudMcpActionTool` to expose CRUD over Laravel MCP with Policy authorization. Supports `$extraTools` and `$parameterDefinitionOverrides`.
 - Artisan commands `make:mcp-crud-resource`, `make:mcp-tool`, and `make:bisual-resource --mcp`.
 
