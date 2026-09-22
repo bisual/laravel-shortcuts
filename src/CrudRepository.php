@@ -264,11 +264,18 @@ abstract class CrudRepository
                             $clause->whereNotNull($attr);
                         } elseif ($val instanceof BackedEnum) {
                             $clause->where($attr, $val);
+                        } elseif (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$/', $val) === 1) {
+                            [$range_from, $range_to] = explode('..', $val, 2);
+                            $clause->whereDate($attr, '>=', $range_from)
+                                ->whereDate($attr, '<=', $range_to);
                         } elseif (str_contains((string) $val, ',')) {
                             $clause->whereIn($attr, explode(',', $val));
                         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
                             $whereClause[] = [$attr, $val];
-                        } elseif ($model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])) {
+                        } elseif (
+                            $model_inst->hasCast($attr, ['date', 'datetime', 'immutable_date', 'immutable_datetime'])
+                            || in_array($attr, ['created_at', 'updated_at', 'deleted_at'], true)
+                        ) {
                             $clause->whereDate($attr, Carbon::parse($val));
                         } else {
                             $whereClause[] = [$attr, 'like', "%{$val}%"];
@@ -852,6 +859,10 @@ abstract class CrudRepository
             $clause->whereNotNull($attribute);
         } elseif ($val instanceof BackedEnum) {
             $clause->where($attribute, $val);
+        } elseif (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$/', $val) === 1) {
+            [$range_from, $range_to] = explode('..', $val, 2);
+            $clause->whereDate($attribute, '>=', $range_from)
+                ->whereDate($attribute, '<=', $range_to);
         } elseif (str_contains((string) $val, ',')) {
             $clause->whereIn($attribute, explode(',', $val));
         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
