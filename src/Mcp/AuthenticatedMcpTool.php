@@ -83,7 +83,7 @@ abstract class AuthenticatedMcpTool extends Tool
 
     protected function rateLimitKey(Authenticatable $user, McpRequest $request): string
     {
-        $encoded = json_encode($request->all(), JSON_SORT_KEYS);
+        $encoded = json_encode($request->all(), 64); // JSON_SORT_KEYS
         $payload_hash = hash('xxh128', $encoded === false ? serialize($request->all()) : $encoded);
 
         return 'mcp-tool:'.$this->name().':'.$user->getAuthIdentifier().':'.$payload_hash;
