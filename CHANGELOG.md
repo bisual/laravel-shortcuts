@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.5.4 - 2026-10-06
+
+### What's Changed
+
+* BP2199 into main by @ericmp33 in https://github.com/bisual/laravel-shortcuts/pull/30
+
+**Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.5.3...v1.5.4
+
 ## v1.5.3 - 2026-09-22
 
 **Full Changelog**: https://github.com/bisual/laravel-shortcuts/compare/v1.5.2...v1.5.3
