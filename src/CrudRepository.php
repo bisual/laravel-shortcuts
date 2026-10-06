@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Bisual\LaravelShortcuts;
 
 use BackedEnum;
-use Bisual\LaravelShortcuts\Traits\HasUuid;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
@@ -134,7 +134,7 @@ abstract class CrudRepository
                 'actions' => [self::ACTION_SHOW, self::ACTION_UPDATE, self::ACTION_DESTROY],
                 'type' => 'string',
                 'validation' => 'required',
-                'description' => 'Primary key (numeric id or UUID when the model uses HasUuid).',
+                'description' => 'Primary key (numeric id or UUID when the model uses HasUuids).',
                 'required' => true,
             ],
         ];
@@ -387,11 +387,11 @@ abstract class CrudRepository
             $id = $id['id'];
         } // per si li hem passat en array
 
-        if (! is_numeric($id) && in_array(HasUuid::class, class_uses_recursive(static::$model), true)) {
+        $shouldLookupByUuid = ! is_numeric($id) && in_array(HasUuids::class, class_uses_recursive(static::$model), strict: true);
+
+        if ($shouldLookupByUuid) {
             $uuid_model = App::make(static::$model);
-            $uuid_field = method_exists($uuid_model, 'getUUIDFieldName')
-                ? $uuid_model->getUUIDFieldName()
-                : 'uuid';
+            $uuid_field = $uuid_model->uniqueIds()[0] ?? 'uuid';
             $clause->where($uuid_field, $id);
         } else {
             $clause->where(App::make(static::$model)->getKeyName(), $id);

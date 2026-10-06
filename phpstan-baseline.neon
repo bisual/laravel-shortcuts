@@ -17,9 +17,3 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: src/Helpers.php
-
-		-
-			message: '#^Trait Bisual\\LaravelShortcuts\\Traits\\HasUuid is used zero times and is not analysed\.$#'
-			identifier: trait.unused
-			count: 1
-			path: src/Traits/HasUuid.php
