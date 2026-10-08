@@ -4,7 +4,6 @@ namespace Bisual\LaravelShortcuts;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 /**
  * HOW TO USE ABSTRACTPRECALCULATEDMODEL
@@ -57,28 +56,28 @@ abstract class AbstractPrecalculatedModel
 
         while ($attempt < $maxAttempts) {
             try {
-                Log::info(get_class($this).' - trying to read key '.$this->getDataKey().' from cache - attempt '.$attempt);
+                ShortcutsLogger::info(get_class($this).' - trying to read key '.$this->getDataKey().' from cache - attempt '.$attempt);
                 // Si la clave existe en caché se retorna el valor cacheado
                 if ($this->check()) {
-                    Log::info(get_class($this).' - successfuly read key '.$this->getDataKey().' from cache in attempt '.$attempt);
+                    ShortcutsLogger::info(get_class($this).' - successfuly read key '.$this->getDataKey().' from cache in attempt '.$attempt);
 
                     return json_decode(Cache::get($this->getDataKey()), true);
                 }
 
-                Log::info(get_class($this).' - key '.$this->getDataKey().' is not in cache, refreshing');
+                ShortcutsLogger::info(get_class($this).' - key '.$this->getDataKey().' is not in cache, refreshing');
                 // Si la clave no existe, realiza un refresh y termina el bucle
                 $this->refresh();
 
                 return json_decode(Cache::get($this->getDataKey()), true);
             } catch (\Exception $e) {
-                Log::error(get_class($this).' - Error getting key '.$this->getDataKey().' from cache: '.$e->getMessage());
+                ShortcutsLogger::error(get_class($this).' - Error getting key '.$this->getDataKey().' from cache: '.$e->getMessage());
                 $attempt++;
 
                 sleep(1);
             }
         }
 
-        Log::info(get_class($this).' - refreshing key '.$this->getDataKey().' from cache after read error');
+        ShortcutsLogger::info(get_class($this).' - refreshing key '.$this->getDataKey().' from cache after read error');
         // Si fallaron todos los intentos, llama a refresh
         $this->refresh();
 
@@ -114,12 +113,12 @@ abstract class AbstractPrecalculatedModel
     final protected function set(array $data): void
     {
         retry(5, function () use ($data) { // retry for 5 times
-            Log::debug(get_class($this).' - Set() attempt');
+            ShortcutsLogger::debug(get_class($this).' - Set() attempt');
             Cache::set($this->getDataKey(), json_encode($data));
             Cache::set($this->getUpdatedAtKey(), Carbon::now()->timestamp);
-            Log::debug(get_class($this).' - Set() attempt successful');
+            ShortcutsLogger::debug(get_class($this).' - Set() attempt successful');
         }, 15000, function ($exception) {
-            Log::error(get_class($this).' - Exception during attempt: '.$exception->getMessage());
+            ShortcutsLogger::error(get_class($this).' - Exception during attempt: '.$exception->getMessage());
 
             return $exception;
         }); // 15s waiting to try again
