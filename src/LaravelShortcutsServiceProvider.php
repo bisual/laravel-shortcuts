@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bisual\LaravelShortcuts;
 
 use Bisual\LaravelShortcuts\Commands\BisualResourceMakeCommand;
@@ -15,13 +17,9 @@ class LaravelShortcutsServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
-        /*
-         * This class is a Package Service Provider
-         *
-         * More info: https://github.com/spatie/laravel-package-tools
-         */
         $package
             ->name('laravel-shortcuts')
+            ->hasConfigFile('shortcuts')
             ->hasCommands(
                 RepositoryMakeCommand::class,
                 DtoMakeCommand::class,
