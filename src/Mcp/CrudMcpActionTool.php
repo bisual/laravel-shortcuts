@@ -151,7 +151,7 @@ final class CrudMcpActionTool extends Tool
 
             if ($name === 'search' && $this->action === CrudRepository::ACTION_INDEX) {
                 $searchable = ModelMcpQueryGuide::searchableFields($model_class);
-                $description = 'Search term (LIKE) on $searchable: '
+                $description = 'Search term (case-insensitive LIKE) on $searchable: '
                     .($searchable === [] ? '(ignored — model has no $searchable)' : implode(', ', $searchable));
             }
 

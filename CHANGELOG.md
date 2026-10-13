@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.5.5 - 2026-10-13
+
+### What's Changed
+
+* Use Laravel `whereLike` / `orWhereLike` for `$searchable` and string filters so searches stay case-insensitive on PostgreSQL.
+
 ## v1.5.4 - 2026-10-06
 
 ### What's Changed

@@ -57,7 +57,7 @@ abstract class CrudRepository
                 'actions' => [self::ACTION_INDEX],
                 'type' => 'string',
                 'validation' => 'string|nullable',
-                'description' => 'Search term applied to the model $searchable fields (LIKE).',
+                'description' => 'Search term applied to the model $searchable fields (case-insensitive LIKE).',
                 'required' => false,
             ],
             'with' => [
@@ -278,7 +278,8 @@ abstract class CrudRepository
                         ) {
                             $clause->whereDate($attr, Carbon::parse($val));
                         } else {
-                            $whereClause[] = [$attr, 'like', "%{$val}%"];
+                            // whereLike is case-insensitive on PostgreSQL (plain LIKE is not).
+                            $clause->whereLike($attr, "%{$val}%");
                         }
                     }
                 }
@@ -304,25 +305,26 @@ abstract class CrudRepository
                 }
             }
 
-            // Process Searchable Fields
+            // Process Searchable Fields (case-insensitive via whereLike)
             if ($search) {
                 $clause->where(function (Builder $query) use (&$searchable_fields, &$search): void {
+                    $needle = "%{$search}%";
                     foreach ($searchable_fields as $idx => $search_field) {
                         $parts = explode('.', $search_field);
                         if (count($parts) === 2) {
                             if ($idx === 0) {
-                                $query->whereHas($parts[0], function (Builder $query) use (&$parts, &$search): void {
-                                    $query->where($parts[1], 'like', "%{$search}%");
+                                $query->whereHas($parts[0], function (Builder $query) use (&$parts, $needle): void {
+                                    $query->whereLike($parts[1], $needle);
                                 });
                             } else {
-                                $query->orWhereHas($parts[0], function (Builder $query) use (&$parts, &$search): void {
-                                    $query->where($parts[1], 'like', "%{$search}%");
+                                $query->orWhereHas($parts[0], function (Builder $query) use (&$parts, $needle): void {
+                                    $query->whereLike($parts[1], $needle);
                                 });
                             }
                         } elseif ($idx === 0) {
-                            $query->where($search_field, 'like', "%{$search}%");
+                            $query->whereLike($search_field, $needle);
                         } else {
-                            $query->orWhere($search_field, 'like', "%{$search}%");
+                            $query->orWhereLike($search_field, $needle);
                         }
                     }
                 });
@@ -868,7 +870,7 @@ abstract class CrudRepository
         } elseif (is_numeric($val) || is_bool($val) || $val === 'false' || $val === 'true') {
             $clause->where($attribute, $val);
         } else {
-            $clause->where($attribute, 'like', "%{$val}%");
+            $clause->whereLike($attribute, "%{$val}%");
         }
     }
 

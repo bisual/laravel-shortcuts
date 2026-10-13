@@ -26,7 +26,7 @@ WHERE / filter dialect (any extra index param that is not reserved becomes a fil
 - attribute=<number|bool|true|false> → where(attribute, =, value)
 - attribute=<date> on date/datetime casts → whereDate(attribute, value)
 - attribute=<date>..<date> (YYYY-MM-DD..YYYY-MM-DD) → whereDate between inclusive (also works for created_at/updated_at)
-- attribute=<string> otherwise → where(attribute, LIKE, %value%)
+- attribute=<string> otherwise → whereLike(attribute, %value%) (case-insensitive)
 - relation.attribute=value or relation-attribute=value → whereHas(relation, …) using the same value rules
 - When using with=relation, you may also pass relation.attribute=value as an eager-load constraint (filters the relation and parent existence).
 Reserved params (not column filters): search, with, without, append, order_by, order_by_direction, page, per_page, limit, scopes, select.
