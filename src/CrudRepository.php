@@ -6,6 +6,7 @@ namespace Bisual\LaravelShortcuts;
 
 use BackedEnum;
 use Carbon\Carbon;
+use Closure;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -330,6 +331,8 @@ abstract class CrudRepository
                 });
             }
 
+            self::applyDefaultIndexOrderIfMissing($clause);
+
             if ($paginate) {
                 $data = $clause->paginate($perPage, ['*'], 'page', $page);
             } else {
@@ -349,15 +352,19 @@ abstract class CrudRepository
 
             /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> $data */
             return $data;
-        } elseif (is_callable($callback)) {
+        }
+
+        if (is_callable($callback)) {
             $clause = self::newQuery();
             $callback($clause, $params);
+            self::applyDefaultIndexOrderIfMissing($clause);
 
             /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> */
             return $paginate ? $clause->paginate($perPage, ['*'], 'page', $page) : $clause->get();
         }
 
         $clause = self::newQuery();
+        self::applyDefaultIndexOrderIfMissing($clause);
 
         /** @var LengthAwarePaginator<int, TModel>|Collection<int, TModel> */
         return $paginate
@@ -382,7 +389,8 @@ abstract class CrudRepository
         if ($id instanceof static::$model) {
             return $id;
         } // ja li hem passat el model
-        elseif (is_object($id)) {
+
+        if (is_object($id)) {
             $id = $id->id;
         } // per si li hem passat algun altre objecte
         elseif (is_array($id)) {
@@ -491,12 +499,24 @@ abstract class CrudRepository
      */
     protected static function newQuery(bool $withoutGlobalScopes = false): Builder
     {
-        /** @var class-string<TModel> $model */
-        $model = static::$model;
-
         return $withoutGlobalScopes
-            ? $model::query()->withoutGlobalScopes()
-            : $model::query();
+            ? static::$model::query()->withoutGlobalScopes()
+            : static::$model::query();
+    }
+
+    /**
+     * @param  Builder<TModel>  $clause
+     */
+    private static function applyDefaultIndexOrderIfMissing(Builder $clause): void
+    {
+        $base_query = $clause->getQuery();
+        $query_already_has_ordering = ! empty($base_query->orders) || ! empty($base_query->unionOrders);
+
+        if ($query_already_has_ordering) {
+            return;
+        }
+
+        $clause->orderBy($clause->getModel()->getQualifiedKeyName());
     }
 
     /**
@@ -610,13 +630,13 @@ abstract class CrudRepository
             return;
         }
 
-        /** @var array<class-string<Model>, array<string, \Closure(Relation): void>> $morph_with */
+        /** @var array<class-string<Model>, array<string, Closure(Relation): void>> $morph_with */
         $morph_with = [];
 
         foreach (array_keys($morph_to->getDictionary()) as $type) {
             $class = Model::getActualClassNameForMorph((string) $type);
 
-            /** @var array<string, \Closure(Relation): void> $with_for_type */
+            /** @var array<string, Closure(Relation): void> $with_for_type */
             $with_for_type = [];
 
             foreach ($nested_with as $nested_relation => $nested_config) {
@@ -766,7 +786,7 @@ abstract class CrudRepository
         $relation_paths = [];
 
         foreach (explode(',', $with) as $segment) {
-            $segment = trim($segment);
+            $segment = mb_trim($segment);
             if ($segment === '') {
                 continue;
             }
@@ -788,14 +808,14 @@ abstract class CrudRepository
                 continue;
             }
 
-            $last_dot = strrpos($attr, '.');
+            $last_dot = mb_strrpos($attr, '.');
 
             if ($last_dot === false) {
                 continue;
             }
 
-            $relation_path = substr($attr, 0, $last_dot);
-            $attribute = substr($attr, $last_dot + 1);
+            $relation_path = mb_substr($attr, 0, $last_dot);
+            $attribute = mb_substr($attr, $last_dot + 1);
 
             if (! isset($relation_paths[$relation_path])) {
                 continue;
@@ -986,7 +1006,7 @@ abstract class CrudRepository
             return;
         }
 
-        /** @var array<class-string<Model>, \Closure(Builder): void> $callbacks */
+        /** @var array<class-string<Model>, Closure(Builder): void> $callbacks */
         $callbacks = [];
 
         foreach (array_keys($morph_to->getDictionary()) as $type) {
