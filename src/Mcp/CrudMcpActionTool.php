@@ -43,6 +43,11 @@ final class CrudMcpActionTool extends Tool
         $this->description = $resource::toolDescriptionFor($action);
     }
 
+    public function shouldRegister(McpRequest $request): bool
+    {
+        return $this->resource::shouldRegister($request->user());
+    }
+
     /**
      * @return array<string, mixed>
      */

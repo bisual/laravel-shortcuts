@@ -28,6 +28,12 @@ abstract class AuthenticatedMcpTool extends Tool
 
     protected int $rateLimitDecaySeconds = 60;
 
+    /**
+     * Whether this tool should be advertised / invokable for the current request user.
+     * Must be implemented by every concrete tool (no default).
+     */
+    abstract public function shouldRegister(McpRequest $request): bool;
+
     final public function handle(McpRequest $request): Response|ResponseFactory
     {
         $user = $this->requireAuthenticatedUser($request);

@@ -384,6 +384,12 @@ abstract class CrudMcpResource
     }
 
     /**
+     * Whether this resource's MCP tools should be advertised / invokable for the user.
+     * Must be implemented by every concrete CrudMcpResource (no default).
+     */
+    abstract public static function shouldRegister(?Authenticatable $user): bool;
+
+    /**
      * Hook before index repository call (mutate $params by reference).
      *
      * @param  array<string, mixed>  $params

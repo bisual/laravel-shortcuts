@@ -98,11 +98,13 @@ TXT,
         $scopes = self::localScopes($model_class, $mcp_scopes);
         $searchable = self::searchableFields($model_class);
 
+        $definitions = self::relationDefinitionsFor($model_class);
+
         $lines = [
             'Catalog for '.class_basename($model_class).' (query syntax: call '.CrudQueryGuideTool::TOOL_NAME.'):',
             'Available relations (with)'
                 .($mcp_with === null ? ', depth '.$relation_depth : '').': '
-                .self::formatRelationTree($relations),
+                .self::formatRelationTree($relations, '', $definitions),
             'Available appends: '.($appends === [] ? '(none)' : implode(', ', $appends)),
             'Filterable attributes: '.($filterable === [] ? '(none)' : implode(', ', $filterable)),
             'Local scopes: '.($scopes === [] ? '(none)' : implode(', ', $scopes)),
@@ -121,8 +123,9 @@ TXT,
     public static function withFieldDescription(string $model_class, int $relation_depth = 2, ?array $mcp_with = null): string
     {
         $relations = self::relationTree($model_class, $relation_depth, $mcp_with);
+        $definitions = self::relationDefinitionsFor($model_class);
 
-        return 'Eager-load relations (CSV; nest with ".."). Allowed: '.self::formatRelationTree($relations)
+        return 'Eager-load relations (CSV; nest with ".."). Allowed: '.self::formatRelationTree($relations, '', $definitions)
             .'. Syntax: '.CrudQueryGuideTool::TOOL_NAME.'.';
     }
 
@@ -422,7 +425,40 @@ TXT,
     /**
      * @param  array<string, array<string, mixed>|list<mixed>>  $tree
      */
-    private static function formatRelationTree(array $tree, string $prefix = ''): string
+    /**
+     * @param  class-string<Model>  $model_class
+     * @return array<string, string>
+     */
+    public static function relationDefinitionsFor(string $model_class): array
+    {
+        try {
+            /** @var Model $model */
+            $model = new $model_class;
+        } catch (Throwable) {
+            return [];
+        }
+
+        if (! property_exists($model, 'relation_definitions') || ! is_array($model->relation_definitions)) {
+            return [];
+        }
+
+        /** @var array<string, string> $definitions */
+        $definitions = [];
+
+        foreach ($model->relation_definitions as $relation => $description) {
+            if (is_string($relation) && is_string($description) && $description !== '') {
+                $definitions[$relation] = $description;
+            }
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>|list<mixed>>  $tree
+     * @param  array<string, string>  $definitions  Root-model `$relation_definitions` (applied to top-level names)
+     */
+    private static function formatRelationTree(array $tree, string $prefix = '', array $definitions = []): string
     {
         if ($tree === []) {
             return $prefix === '' ? '(none)' : '';
@@ -433,11 +469,17 @@ TXT,
 
         foreach ($tree as $name => $children) {
             $path = $prefix === '' ? $name : $prefix.'..'.$name;
-            $parts[] = $path;
+            $label = $path;
+
+            if ($prefix === '' && isset($definitions[$name])) {
+                $label = $path.' ('.$definitions[$name].')';
+            }
+
+            $parts[] = $label;
 
             if (is_array($children) && $children !== [] && array_is_list($children) === false) {
                 /** @var array<string, array<string, mixed>|list<mixed>> $children */
-                $nested = self::formatRelationTree($children, $path);
+                $nested = self::formatRelationTree($children, $path, []);
 
                 if ($nested !== '') {
                     $parts[] = $nested;

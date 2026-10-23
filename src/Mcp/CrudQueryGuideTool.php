@@ -22,6 +22,11 @@ final class CrudQueryGuideTool extends Tool
 {
     public const TOOL_NAME = 'crud-query-guide';
 
+    public function shouldRegister(Request $request): bool
+    {
+        return $request->user() !== null;
+    }
+
     public function handle(Request $request): Response
     {
         return Response::text(ModelMcpQueryGuide::dialectGuide());

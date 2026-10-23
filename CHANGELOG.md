@@ -2,6 +2,13 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.5.8 - 2026-10-23
+
+### What's Changed
+
+* MCP: abstract `shouldRegister` on `CrudMcpResource` and `AuthenticatedMcpTool`; `CrudMcpActionTool` / `CrudQueryGuideTool` wire it for Laravel MCP eligibility.
+* MCP: read model `$relation_definitions` in `ModelMcpQueryGuide` so relation catalogs include LLM-facing descriptions.
+
 ## v1.5.7 - 2026-10-19
 
 ### What's Changed
