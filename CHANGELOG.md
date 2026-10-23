@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-shortcuts` will be documented in this file.
 
+## v1.5.9 - 2026-10-23
+
+### What's Changed
+
+* `CrudController::index`: run the optional `$callback` before `authorize('viewAny')`, and authorize with the final `$params` (so injected scopes like `forUser` are visible to the policy).
+
 ## v1.5.8 - 2026-10-23
 
 ### What's Changed

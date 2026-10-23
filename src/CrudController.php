@@ -46,10 +46,6 @@ abstract class CrudController extends BaseController
 
     public function index(Request $request, ?callable $callback = null): AnonymousResourceCollection
     {
-        if (static::$authorize['index']) {
-            $this->authorize('viewAny', [static::$model, $request->query()]);
-        }
-
         if (is_array(static::$indexQueryValidations) && count(static::$indexQueryValidations) > 0) {
             $params = Validator::make($request->query(), CrudRepository::indexValidationRules(static::$indexQueryValidations))->validate();
         } elseif (is_string(static::$indexQueryValidations) && is_subclass_of(static::$indexQueryValidations, FormRequest::class)) {
@@ -58,8 +54,13 @@ abstract class CrudController extends BaseController
             $params = $request->query();
         }
 
+        // Callback may inject scopes / filters (e.g. forUser); authorize against the final params.
         if ($callback !== null) {
             $callback($params);
+        }
+
+        if (static::$authorize['index']) {
+            $this->authorize('viewAny', [static::$model, $params]);
         }
 
         return JsonResource::collection((static::$repository)::index($params, isset($params['page'])));
